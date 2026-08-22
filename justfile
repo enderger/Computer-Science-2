@@ -38,6 +38,14 @@ run executable mode='debug': (build mode)
 	export EXE="$(echo "{{executable}}" | sed -E 's|([^-]*).*|\1/\0|')" && \
 	"{{BUILDDIR}}/${EXE}"
 
+[arg('executable', help="The executable to debug")]
+[arg('mode', help="The optimization mode to use")]
+debug executable mode='debug': (build mode)
+	[[ "{{mode}}" == "release" ]] && echo >&2 "Cannot debug a release build" && exit 1
+	export EXE="$(echo "{{executable}}" | sed -E 's|([^-]*).*|\1/\0|')" && \
+	lldb "{{BUILDDIR}}/${EXE}"
+
+
 [arg('mode', help="The optimization mode to use")]
 install mode='release': (build mode)
 	meson install
