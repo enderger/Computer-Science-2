@@ -18,8 +18,8 @@ BUILDDIR := env("BUILDDIR", 'build')
 configure mode='debug':
 	# THIS IS INTENTIONALLY UNQUOTED, THE ARGS ARE MEANT TO BE INTERPRETED AS A LIST.
 	case '{{mode}}' in \
-		"debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0";; \
-		"thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1";; \
+		"debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Dcpp_args=-fno-sanitize-recover";; \
+		"thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Dcpp_args=-fno-sanitize-recover";; \
 		"release") export FLAGS="--buildtype=release";; \
 	esac && \
 	meson setup '{{BUILDDIR}}' --reconfigure ${FLAGS}

@@ -28,26 +28,26 @@ configure project mode='debug':
 [arg('project', help="Which project to build")]
 [arg('mode', help="The optimization mode to use")]
 build project mode='debug': (configure project mode)
-	direnv exec '{{project}}' --command \
+	direnv exec '{{project}}' \
 		ninja -C '{{project}}/build'
 
 [arg('project', help="Which project to run")]
 [arg('mode', help="The optimization mode to use")]
 run project mode='debug': (build project mode)
-	direnv exec '{{project}}' --command \
+	direnv exec '{{project}}' \
 		'{{project}}/build/{{project}}'
 
 [arg('project', help="Which project to debug")]
 [arg('mode', help="The optimization mode to use")]
 debug project mode='debug': (build project mode)
 	[[ "{{mode}}" == "release" ]] && echo >&2 "Cannot debug a release build" && exit 1
-	direnv exec '{{project}}' --command \
+	direnv exec '{{project}}' \
 		lldb '{{project}}/build/{{project}}'
 
 [arg('project', help="Which project to install")]
 [arg('mode', help="The optimization mode to use")]
 install project mode='release': (build project mode)
-	direnv exec '{{project}}' --command \
+	direnv exec '{{project}}' \
 		meson install -C '{{project}}/build'
 
 [arg('project', help="Which project to clean")]

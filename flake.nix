@@ -73,7 +73,13 @@
         def = projectDefinition system name;
       in llvm.stdenv.mkDerivation (extendDerivationAttrs
           { nativeBuildInputs = baseTools; }
-          { pname = name; version = "0.1.0"; src = ./projects + "/${name}"; } // def);
+          {
+            pname = name;
+            version = "0.1.0";
+            src = ./projects + "/${name}";
+
+            doCheck = true;
+          } // def);
 
       projectPackages = nixpkgs.lib.genAttrs projectNames mkProject;
     in projectPackages // {
@@ -81,6 +87,8 @@
           pname = "compsci2-assignments";
           version = "0.1.0";
           src = ./assignments;
+          doCheck = true;
+          mesonFlags = [ "-Dbuildtype=release" ];
 
           nativeBuildInputs = baseTools;
         };
@@ -101,7 +109,7 @@
         };
 
         init-assignment = pkgs.stdenv.mkDerivation {
-          pname = "compsci2-picker";
+          pname = "compsci2-init";
           version = "0.1.0";
           dontUnpack = true;
           src = ./assignments/init.scm;
@@ -124,6 +132,16 @@
       };
     });
 
+    checks = forEachSupportedSystem ({ system, ... }: {
+      assignments = self.packages.${system}.assignments.overrideAttrs (old: {
+        mesonFlags = [ 
+          "-Db_sanitize=address,undefined" 
+          "-Dcpp_args=-fno-sanitize-recover=undefined"
+        ];
+        doCheck = true;
+      });
+    });
+
     devShells = forEachSupportedSystem ({ pkgs, llvm, system, ... }: let
       basePackages = [ 
         llvm.clang
@@ -137,15 +155,12 @@
         pkgs.pkg-config
       ];
 
-      mkProjectShell = name: pkgs.mkShell {
-        stdenv = llvm.stdenv;
-        packages = let 
-          def = projectDefinition system name;
-        in pkgs.mkShell (extendDerivationAttrs 
-            { nativeBuildInputs = basePackages; }
-            def
+      mkProjectShell = name: let 
+        def = projectDefinition system name;
+      in pkgs.mkShell (extendDerivationAttrs 
+          { nativeBuildInputs = basePackages; }
+          (def // { inherit (llvm) stdenv; })
         );
-      };
 
       projectDevShells = nixpkgs.lib.genAttrs projectNames mkProjectShell;
     in projectDevShells // {

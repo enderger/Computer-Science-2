@@ -22,3 +22,4 @@ project('compsci2', 'cpp',
 )
 
 subdir('week1')
+subdir('week3')

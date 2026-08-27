@@ -107,7 +107,7 @@
 (when (or (= conflict-count 0) (= conflict-count template-count))
     (append-week-if-nonexistent! "meson.build" week-dir))
 
-(unless (= existing-count 0)
+(unless (= conflict-count 0)
   (error (string-append "week" week-string "-day"
                         " already has scaffolded files: "
                         (string-join (map (lambda (raw-name) 
