@@ -7,4 +7,5 @@ test('week@@WEEK@@-day@@DAY@@',
 executable('week@@WEEK@@-day@@DAY@@', 'week@@WEEK@@-day@@DAY@@.cpp', 'week@@WEEK@@-day@@DAY@@-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: doctest_dep,
-    include_directories: incdir)
+    include_directories: incdir,
+    install: true)

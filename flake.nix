@@ -67,7 +67,7 @@
     schemas = flake-schemas.schemas;
 
     packages = forEachSupportedSystem ({pkgs, llvm, system, ...}: let
-      baseTools = [ llvm.clang pkgs.meson pkgs.ninja pkgs.doctest ];
+      baseTools = [ llvm.clang pkgs.meson pkgs.ninja pkgs.doctest pkgs.pkg-config ];
 
       mkProject = name: let
         def = projectDefinition system name;
@@ -114,7 +114,7 @@
           meta.mainProgram = "compsci2-init";
         };
 
-        default = self.packages.${system}.assignment-picker;
+        default = self.packages.${system}.assignments;
     });
 
     apps = forEachSupportedSystem ({ pkgs, system, ... }: {
