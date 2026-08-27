@@ -12,4 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # 
-executable('week1-day1', 'day1.cpp', install : true)
+# Generated from template
+# 
+doctest_dep = dependency('doctest')
+incdir = include_directories('include')
+
+test('week3-day1',
+  executable('week3-day1-tests', 'week3-day1.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
+    dependencies: doctest_dep,
+    include_directories: incdir))
+
+executable('week3-day1', 'week3-day1.cpp', 'week3-day1-runner.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
+    dependencies: doctest_dep,
+    include_directories: incdir)

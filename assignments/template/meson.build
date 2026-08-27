@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # 
+# Generated from template
+# 
+doctest_dep = dependency('doctest')
+incdir = include_directories('include')
 
-mod assignments
-mod projects
-
-default:
-    @just --list
-
-    @echo "# Assignments"
-    @just --list assignments
-
-    @echo "# Projects"
-    @just --list projects

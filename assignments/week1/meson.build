@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # 
+# Generated from template
+# 
+doctest_dep = dependency('doctest')
+incdir = include_directories('include')
 
-mod assignments
-mod projects
+executable('week1-day1', 'week1-day1.cpp')
 
-default:
-    @just --list
+test('week1-day2',
+  executable('week1-day2-tests', 'week1-day2.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
+    dependencies: doctest_dep,
+    include_directories: incdir))
 
-    @echo "# Assignments"
-    @just --list assignments
-
-    @echo "# Projects"
-    @just --list projects
+executable('week1-day2', 'week1-day2.cpp', 'week1-day2-runner.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
+    dependencies: doctest_dep,
+    include_directories: incdir)
