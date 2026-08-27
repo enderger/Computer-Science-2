@@ -17,15 +17,15 @@
 doctest_dep = dependency('doctest')
 incdir = include_directories('include')
 
-executable('week1-day1', 'week1-day1.cpp', install: true)
+executable('week1-problem1', 'week1-problem1.cpp', install: true)
 
-test('week1-day2',
-  executable('week1-day2-tests', 'week1-day2.cpp',
+test('week1-problem2',
+  executable('week1-problem2-tests', 'week1-problem2.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
     dependencies: doctest_dep,
     include_directories: incdir))
 
-executable('week1-day2', 'week1-day2.cpp', 'week1-day2-runner.cpp',
+executable('week1-problem2', 'week1-problem2.cpp', 'week1-problem2-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: doctest_dep,
     include_directories: incdir,

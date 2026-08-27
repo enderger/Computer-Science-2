@@ -15,25 +15,32 @@
 *
 * Generated from template
 */
-#include <format>
-#include <string>
+#include <print>
 #include <string_view>
-
-#include <doctest/doctest.h>
-
-#include "include/week3-day1.hpp"
 
 using namespace std::string_view_literals;
 
-// IMPLEMENTATION
-// TODO: Implement the solution here
-auto hutzdog_cs2_week3::get_greeting(std::string_view who) -> std::string {
-    return std::format("Hello, {}!", who);
-}
+#include "include/week1-problem2.hpp"
 
-// TESTS
-// TODO: Implement the tests here
-TEST_CASE("testing the get_greeting function") {
-    CHECK(hutzdog_cs2_week3::get_greeting("World") == "Hello, World!");
-    CHECK(hutzdog_cs2_week3::get_greeting("Professor") == "Hello, Professor!");
+// MAIN
+// TODO: Replace with your actual code
+int main(int argc, const char *argv[]) {
+    std::println(stderr, "Week 1 Problem 2 assignment");
+    switch (argc) {
+        case 1:
+            std::println("{}", hutzdog_cs2_week1::get_greeting("World"));
+            return 0;
+
+        case 2:
+            std::println("{}", hutzdog_cs2_week1::get_greeting(std::string_view(argv[1])));
+            return 0;
+
+        default:
+            std::println(
+                stderr,
+                "Invalid usage. Usage: {} [name]", 
+                argv[0]
+            );
+            return 1;
+    }
 }

@@ -21,7 +21,7 @@
 
 #include <doctest/doctest.h>
 
-#include "include/week1-day2.hpp"
+#include "include/week1-problem2.hpp"
 
 using namespace std::string_view_literals;
 

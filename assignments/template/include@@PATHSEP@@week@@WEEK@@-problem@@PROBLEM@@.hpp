@@ -18,13 +18,13 @@
 #include <string>
 #include <string_view>
 
-#ifndef HUTZDOG_CS2_ASSIGN_WEEK3_DAY1
-#define HUTZDOG_CS2_ASSIGN_WEEK3_DAY1
+#ifndef HUTZDOG_CS2_ASSIGN_WEEK@@WEEK@@_PROBLEM@@PROBLEM@@
+#define HUTZDOG_CS2_ASSIGN_WEEK@@WEEK@@_PROBLEM@@PROBLEM@@
 
-namespace hutzdog_cs2_week3 {
+namespace hutzdog_cs2_week@@WEEK@@ {
 // TODO: Declare functions here
 auto get_greeting(std::string_view who) -> std::string;
 }
 
-#endif // HUTZDOG_CS2_ASSIGN_WEEK3_DAY1
+#endif // HUTZDOG_CS2_ASSIGN_WEEK@@WEEK@@_PROBLEM@@PROBLEM@@
  

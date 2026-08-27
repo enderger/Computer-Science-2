@@ -18,21 +18,21 @@
 #include <print>
 #include <string_view>
 
-#include "include/week3-day1.hpp"
+#include "include/week@@WEEK@@-problem@@PROBLEM@@.hpp"
 
 using namespace std::string_view_literals;
 
 // MAIN
 // TODO: Replace with your actual code
 int main(int argc, const char *argv[]) {
-    std::println(stderr, "Week 3 Day 1 assignment");
+    std::println(stderr, "Week @@WEEK@@ Problem @@PROBLEM@@ assignment");
     switch (argc) {
         case 1:
-            std::println("{}", hutzdog_cs2_week3::get_greeting("World"));
+            std::println("{}", hutzdog_cs2_week@@WEEK@@::get_greeting("World"));
             return 0;
 
         case 2:
-            std::println("{}", hutzdog_cs2_week3::get_greeting(std::string_view(argv[1])));
+            std::println("{}", hutzdog_cs2_week@@WEEK@@::get_greeting(std::string_view(argv[1])));
             return 0;
 
         default:

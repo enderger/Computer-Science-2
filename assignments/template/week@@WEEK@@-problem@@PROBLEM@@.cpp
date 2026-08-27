@@ -12,19 +12,28 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-* 
+*
 * Generated from template
 */
+#include <format>
 #include <string>
 #include <string_view>
 
-#ifndef HUTZDOG_CS2_ASSIGN_WEEK1_DAY2
-#define HUTZDOG_CS2_ASSIGN_WEEK1_DAY2
+#include <doctest/doctest.h>
 
-namespace hutzdog_cs2_week1 {
-// TODO: Declare functions here
-auto get_greeting(std::string_view who) -> std::string;
+#include "include/week@@WEEK@@-problem@@PROBLEM@@.hpp"
+
+using namespace std::string_view_literals;
+
+// IMPLEMENTATION
+// TODO: Implement the solution here
+auto hutzdog_cs2_week@@WEEK@@::get_greeting(std::string_view who) -> std::string {
+    return std::format("Hello, {}!", who);
 }
 
-#endif // HUTZDOG_CS2_ASSIGN_WEEK1_DAY2
- 
+// TESTS
+// TODO: Implement the tests here
+TEST_CASE("testing the get_greeting function") {
+    CHECK(hutzdog_cs2_week@@WEEK@@::get_greeting("World") == "Hello, World!");
+    CHECK(hutzdog_cs2_week@@WEEK@@::get_greeting("Professor") == "Hello, Professor!");
+}

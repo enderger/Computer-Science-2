@@ -29,9 +29,9 @@
 ; ARGUMENT PARSING
 (define args (cdr (program-arguments)))
 (unless (= (length args) 2)
-  (error "usage: init.scm <week> <day>"))
+  (error "usage: init.scm <week> <problem>"))
 (define week-string (car args))
-(define day-string (cadr args))
+(define problem-string (cadr args))
 (define week-dir (string-append "week" week-string))
 
 ; CHANGE WORKING DIRECTORY
@@ -55,12 +55,12 @@
   (let* ((week-substituted (regexp-substitute/global #f "@@WEEK@@"
                                                      text 
                                                      'pre week-string 'post))
-         (day-substituted (regexp-substitute/global #f "@@DAY@@"
+         (problem-substituted (regexp-substitute/global #f "@@PROBLEM@@"
                                                     week-substituted 
-                                                    'pre day-string 'post))
+                                                    'pre problem-string 'post))
          (pathsep-substituted 
            (regexp-substitute/global #f "@@PATHSEP@@"
-                                     day-substituted
+                                     problem-substituted
                                      'pre file-name-separator-string 'post))) 
     pathsep-substituted))
 
@@ -94,21 +94,21 @@
 ; IMPLEMENTATION
 
 ;; Check for conflicting files
-(define day-scoped (filter (lambda (raw-name) (not (has-append? raw-name)))
+(define problem-scoped (filter (lambda (raw-name) (not (has-append? raw-name)))
                            (template-entries %template-dir))) 
                                    
 (define file-conflicts
   (filter (lambda (raw-name)
             (file-exists? (file/ week-dir (substitute-placeholders raw-name))))
-          day-scoped))
-(define template-count (length day-scoped))
+          problem-scoped))
+(define template-count (length problem-scoped))
 (define conflict-count (length file-conflicts))
 
 (when (or (= conflict-count 0) (= conflict-count template-count))
     (append-week-if-nonexistent! "meson.build" week-dir))
 
 (unless (= conflict-count 0)
-  (error (string-append "week" week-string "-day"
+  (error (string-append "week" week-string "-problem" problem-string
                         " already has scaffolded files: "
                         (string-join (map (lambda (raw-name) 
                                             (file/ week-dir
