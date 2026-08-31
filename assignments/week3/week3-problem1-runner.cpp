@@ -32,7 +32,7 @@ int main(int argc, const char *argv[]) {
             return 0;
 
         case 2:
-            std::println("{}", hutzdog_cs2_week3::get_greeting(std::string_view(argv[1])));
+            std::println("{}", hutzdog_cs2_week3::get_greeting(argv[1]));
             return 0;
 
         default:
