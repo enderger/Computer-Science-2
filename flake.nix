@@ -33,7 +33,28 @@
 
     getSystemAttrs = system: rec {
       pkgs = import nixpkgs { inherit system; };
-      llvm = pkgs.llvmPackages_21;
+      llvm = pkgs.llvmPackages_22;
+
+      dev-tools = let
+        racket-tools = [
+          pkgs.racket
+          nur.legacyPackages.${system}.repos.DzmingLi.racket-langserver
+        ];
+        cpp-tools = [
+          llvm.clang
+          llvm.clang-tools
+          llvm.lldb
+          pkgs.meson
+          pkgs.mesonlsp
+          pkgs.doctest
+          pkgs.just
+          pkgs.pkg-config
+          pkgs.ninja
+        ];
+        nix-tools = [
+          pkgs.nixd
+        ];
+      in racket-tools ++ cpp-tools ++ nix-tools;
 
       inherit system inputs;
     };
@@ -66,7 +87,7 @@
   in {
     schemas = flake-schemas.schemas;
 
-    packages = forEachSupportedSystem ({pkgs, llvm, system, ...}: let
+    packages = forEachSupportedSystem ({pkgs, llvm, system, dev-tools, ...}: let
       baseTools = [ llvm.clang pkgs.meson pkgs.ninja pkgs.doctest pkgs.pkg-config ];
 
       mkProject = name: let
@@ -94,21 +115,41 @@
         evzen-wybitul.magic-racket
       ];
 
-      racketTools = [
-        pkgs.racket
-        nur.legacyPackages.${system}.repos.DzmingLi.racket-langserver
-      ];
+      mkBaseSelfSignedCodium = name: base: pkgs.stdenv.mkDerivation {
+        pname = name + "-self-signed";
+        version = "0.1.0";
+        dontUnpack = true;
+        nativeBuildInputs = [ pkgs.makeWrapper pkgs.darwin.sigtool ];
+        buildPhase = ''
+          mkdir -p $out
+          cp -r ${base}/* $out/
+          chmod -R u+w $out
+          substituteInPlace "$out/Applications/VSCodium.app/Contents/Resources/app/product.json" \
+            --replace-fail \
+              '"updateUrl": "https://raw.githubusercontent.com/VSCodium/versions/refs/heads/master"' \
+              '"updateUrl": ""'
+          find "$out/Applications/VSCodium.app" -type f \
+            -exec sigtool -f {} check-requires-signature \; \
+            -exec codesign -s - -f {} \;
+
+          rm -f "$out/bin/codium"
+          makeWrapper "$out/Applications/VSCodium.app/Contents/MacOS/VSCodium" "$out/bin/codium"
+        '';
+        dontInstall = true;
+      };
 
       mkBaseCodium = name: base: pkgs.writeShellApplication {
         inherit name;
-        runtimeInputs = racketTools;
+        runtimeInputs = dev-tools;
         text = ''
             repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
             if [ -z "$repo_root" ] || [ ! -f "$repo_root/compsci2.code-workspace" ]; then
               echo "error: run this from within a checkout of the compsci2 repository" >&2
               exit 1
             fi
-            exec "${pkgs.lib.getExe base}" "$repo_root/compsci2.code-workspace" "$@"
+            exec "${if pkgs.stdenv.hostPlatform.isDarwin
+                    then mkBaseSelfSignedCodium name base
+                    else base}/bin/codium" "$repo_root/compsci2.code-workspace" "$@"
         '';
       };
 
@@ -150,9 +191,9 @@
         pname = "compsci2-init";
         version = "0.1.0";
         dontUnpack = true;
-          src = ./assignments/init.rkt;
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-          installPhase = ''
+        src = ./assignments/init.rkt;
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        installPhase = ''
           install -Dm755 $src $out/bin/compsci2-init
           wrapProgram $out/bin/compsci2-init \
             --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.racket ]}
@@ -183,26 +224,16 @@
       });
     });
 
-    devShells = forEachSupportedSystem ({ pkgs, llvm, system, ... }: let
-      basePackages = [
-        llvm.clang
-        llvm.clang-tools
-        llvm.lldb
-
+    devShells = forEachSupportedSystem ({ pkgs, llvm, system, dev-tools, ... }: let
+      basePackages = dev-tools ++ [
         self.packages.${system}.codium
         self.packages.${system}.codium-vim
-
-        pkgs.doctest
-        pkgs.just
-        pkgs.meson
-        pkgs.ninja
-        pkgs.pkg-config
       ];
 
       mkProjectShell = name: let
         def = projectDefinition system name;
       in pkgs.mkShell (extendDerivationAttrs
-          { nativeBuildInputs = basePackages; }
+          { propagatedBuildInputs = basePackages; }
           (def // { inherit (llvm) stdenv; })
         );
 
@@ -210,7 +241,7 @@
     in projectDevShells // {
         default = pkgs.mkShell {
           stdenv = llvm.stdenv;
-          packages = basePackages;
+          nativeBuildInputs = basePackages;
         };
       });
   };

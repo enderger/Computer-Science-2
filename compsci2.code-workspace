@@ -1,0 +1,37 @@
+{
+  "folders": [
+    { "name": "root", "path": "." },
+    { "name": "assignments", "path": "assignments" }
+  ],
+  "settings": {
+    "update.mode": "none",
+
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+
+    "clangd.path": "clangd",
+    "clangd.arguments": ["--background-index", "--query-driver=/nix/store/**"],
+    "C_Cpp.intelliSenseEngine": "disabled",
+
+    "nix.enableLanguageServer": true,
+    "nix.serverPath": "nixd",
+
+    "mesonbuild.buildFolder": "build",
+
+    "magicRacket.languageServer.command": "racket-langserver",
+
+    "mkhl-just.executablePath": "just"
+  },
+  "extensions": {
+    "recommendations": [
+      "shaunlebron.vscode-parinfer",
+      "evzen-wybitul.magic-racket",
+      "llvm-vs-code-extensions.vscode-clangd",
+      "mesonbuild.mesonbuild",
+      "jnoortheen.nix-ide",
+      "mkhl.mkhl-just",
+      "mkhl.direnv",
+      "editorconfig.editorconfig"
+    ]
+  }
+}

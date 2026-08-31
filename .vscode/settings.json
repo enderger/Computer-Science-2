@@ -1,0 +1,10 @@
+{
+  "files.exclude": {
+    "assignments": true,
+    "projects": true
+  },
+  "files.readonlyInclude": {
+    "assignments/**": true,
+    "projects/**": true
+  }
+}
