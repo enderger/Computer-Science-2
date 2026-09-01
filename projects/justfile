@@ -23,36 +23,39 @@ configure project mode='debug':
 		"release") export FLAGS="--buildtype=release";; \
 	esac && \
 	direnv exec '{{project}}' \
-		meson setup '{{project}}/build' '{{project}}' ${FLAGS}
+		meson setup '{{project}}/build-{{mode}}' '{{project}}' ${FLAGS} --wipe
 
 [arg('project', help="Which project to build")]
 [arg('mode', help="The optimization mode to use")]
 build project mode='debug': (configure project mode)
 	direnv exec '{{project}}' \
-		ninja -C '{{project}}/build'
+		ninja -C '{{project}}/build-{{mode}}'
 
-test: (build "debug")
-    meson test -C "{{BUILDDIR}}"
+test project mode='debug': (build project mode)
+    meson test -C "{{project}}/build-{{mode}}"
 
 [arg('project', help="Which project to run")]
 [arg('mode', help="The optimization mode to use")]
 run project mode='debug': (build project mode)
 	direnv exec '{{project}}' \
-		'{{project}}/build/{{project}}'
+		'{{project}}/build-{{mode}}/{{project}}'
 
 [arg('project', help="Which project to debug")]
 [arg('mode', help="The optimization mode to use")]
 debug project mode='debug': (build project mode)
-	[[ "{{mode}}" == "release" ]] && echo >&2 "Cannot debug a release build" && exit 1
+	if [ "{{mode}}" == "release" ]; then; \
+		echo >&2 "Cannot debug a release build"; \
+		exit 1; \
+	fi
 	direnv exec '{{project}}' \
-		lldb '{{project}}/build/{{project}}'
+		lldb '{{project}}/build-{{mode}}/{{project}}'
 
 [arg('project', help="Which project to install")]
 [arg('mode', help="The optimization mode to use")]
 install project mode='release': (build project mode)
 	direnv exec '{{project}}' \
-		meson install -C '{{project}}/build'
+		meson install -C '{{project}}/build-{{mode}}'
 
 [arg('project', help="Which project to clean")]
 clean project:
-	rm -r '{{project}}/build'
+	rm -r '{{project}}/build'*

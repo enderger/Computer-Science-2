@@ -84,7 +84,7 @@ limitations under the License.
                              '())]
          [contains-line (member line existing-lines)])
     (unless contains-line
-      (display-to-file (string-append "\n" line) file #:exists 'append))))
+      (display-to-file (string-append line "\n") file #:exists 'append))))
 
 ; Substitute a template in this text
 (provide substitute-placeholder)

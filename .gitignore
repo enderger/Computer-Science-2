@@ -1,6 +1,7 @@
-build/
+build*/
 builddir/
 .cache/
 /.direnv
 /result
 /result-*
+compiled/

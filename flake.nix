@@ -169,7 +169,7 @@
         def = projectDefinition system name;
       in llvm.stdenv.mkDerivation (extendDerivationAttrs
           { nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ]; }
-          {
+          ({
             pname = name;
             version = "0.1.0";
             outputs = [ "out" "doc" ];
@@ -179,7 +179,7 @@
             postBuild = ''
               substitute-doxygen "$doc" "$src"
             '';
-          } // def);
+          } // def));
     in projectPackages // {
       assignments = llvm.stdenv.mkDerivation {
         pname = "compsci2-assignments";
@@ -261,18 +261,20 @@
 
       mkProjectShell = name: let
         def = projectDefinition system name;
-      in pkgs.mkShell (extendDerivationAttrs
-          { propagatedBuildInputs = basePackages; }
-          (def // { inherit (llvm) stdenv; })
+      in pkgs.mkShell.override
+        { inherit (llvm) stdenv; }
+        (extendDerivationAttrs
+          { nativeBuildInputs = basePackages; }
+          def
         );
 
       projectDevShells = nixpkgs.lib.genAttrs projectNames mkProjectShell;
     in projectDevShells // {
-        default = pkgs.mkShell {
+        default = pkgs.mkShell.override {
           stdenv = llvm.stdenv;
+        } {
           nativeBuildInputs = basePackages;
         };
       });
-
   };
 }

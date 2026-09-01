@@ -23,3 +23,4 @@ project('compsci2-assignments', 'cpp',
 
 subdir('week1')
 subdir('week3')
+
