@@ -18,11 +18,12 @@
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2605.1012336";
     flake-schemas.url = "https://flakehub.com/f/DeterminateSystems/flake-schemas/0.5.0";
+    hercules-ci-effects.url = "github:hercules-ci/hercules-ci-effects";
     nix-vscode-extensions.url = "github:nix-community/nix-vscode-extensions";
     nur.url = "github:nix-community/NUR/main";
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-schemas, nix-vscode-extensions, nur }: let
+  outputs = inputs@{ self, nixpkgs, flake-schemas, hercules-ci-effects, nix-vscode-extensions, nur }: let
     supportedSystems = [
       "aarch64-darwin"
       "x86_64-darwin"
@@ -90,18 +91,6 @@
     packages = forEachSupportedSystem ({pkgs, llvm, system, dev-tools, ...}: let
       baseTools = [ llvm.clang pkgs.meson pkgs.ninja pkgs.doctest pkgs.pkg-config ];
 
-      mkProject = name: let
-        def = projectDefinition system name;
-      in llvm.stdenv.mkDerivation (extendDerivationAttrs
-          { nativeBuildInputs = baseTools; }
-          {
-            pname = name;
-            version = "0.1.0";
-            src = ./projects + "/${name}";
-
-            doCheck = true;
-          } // def);
-
       projectPackages = nixpkgs.lib.genAttrs projectNames mkProject;
 
       codiumExtensions = nix-vscode-extensions.extensions.${system}.open-vsx;
@@ -161,15 +150,49 @@
             vscodeExtensions = sharedCodiumExtensions ++ extraExtensions;
           }
       );
+
+      substituteDoxygen = { name, input ? ./templates/Doxyfile.template, output ? "share/doc/${name}", ... }: pkgs.writeShellApplication {
+        name = "substitute-doxygen";
+        runtimeInputs = [ pkgs.gnused pkgs.doxygen ];
+        text = ''
+          doc="$1"
+          srcPath="$2"
+          mkdir -p "$doc/${output}"
+          cd "$srcPath"
+          sed -e "s|@@NAME@@|${name}|" \
+              -e "s|@@OUTPUT@@|$doc/${output}|" \
+              ${input} | doxygen -
+        '';
+      };
+
+      mkProject = name: let
+        def = projectDefinition system name;
+      in llvm.stdenv.mkDerivation (extendDerivationAttrs
+          { nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ]; }
+          {
+            pname = name;
+            version = "0.1.0";
+            outputs = [ "out" "doc" ];
+            src = ./projects + "/${name}";
+
+            doCheck = true;
+            postBuild = ''
+              substitute-doxygen "$doc" "$src"
+            '';
+          } // def);
     in projectPackages // {
-        assignments = llvm.stdenv.mkDerivation {
-          pname = "compsci2-assignments";
-          version = "0.1.0";
+      assignments = llvm.stdenv.mkDerivation {
+        pname = "compsci2-assignments";
+        version = "0.1.0";
+        outputs = [ "out" "doc" ];
         src = ./assignments;
         doCheck = true;
-        mesonFlags = [ "-Dbuildtype=release" ];
+        mesonFlags = [ "--buildtype=release" ];
 
-        nativeBuildInputs = baseTools;
+        nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
+        postBuild = ''
+          substitute-doxygen "$doc" "$src"
+        '';
       };
 
       assignment-picker = pkgs.stdenv.mkDerivation {
@@ -224,6 +247,12 @@
       });
     });
 
+    herculesCI = hercules-ci-effects.lib.mkHerculesCI { inherit inputs; } {
+      herculesCI = {
+        ciSystems = [ "x86_64-linux" "aarch64-darwin" ];
+      };
+    };
+
     devShells = forEachSupportedSystem ({ pkgs, llvm, system, dev-tools, ... }: let
       basePackages = dev-tools ++ [
         self.packages.${system}.codium
@@ -244,5 +273,6 @@
           nativeBuildInputs = basePackages;
         };
       });
+
   };
 }
