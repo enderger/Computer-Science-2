@@ -82,9 +82,15 @@ limitations under the License.
   (let* ([existing-lines (if (file-exists? file)
                              (file->lines file)
                              '())]
-         [contains-line (member line existing-lines)])
-    (unless contains-line
-      (display-to-file (string-append line "\n") file #:exists 'append))))
+         [contains-line (member line existing-lines)]
+         [ends-in-newline (equal? (last existing-lines) "")])
+    (with-output-to-file file #:exists 'append
+      (lambda ()
+        (unless contains-line
+          (unless ends-in-newline
+            (newline)
+            (display-to-file (string-append line "\n") file #:exists 'append)))))))
+
 
 ; Substitute a template in this text
 (provide substitute-placeholder)

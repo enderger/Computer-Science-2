@@ -24,7 +24,7 @@ using namespace std::string_view_literals;
 
 // MAIN
 // TODO: Replace with your actual code
-int main(int argc, const char *argv[]) {
+auto main(int argc, const char *argv[]) -> int {
     std::println(stderr, "Week 3 Problem 1 assignment");
     switch (argc) {
         case 1:

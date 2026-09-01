@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+set positional-arguments
+
 BASE := justfile_directory()
 
 [arg('project', help="Which project to configure")]
@@ -23,7 +25,7 @@ configure project mode='debug':
 		"release") export FLAGS="--buildtype=release";; \
 	esac && \
 	direnv exec '{{project}}' \
-		meson setup '{{project}}/build-{{mode}}' '{{project}}' ${FLAGS} --wipe
+		meson setup '{{project}}/build-{{mode}}' '{{project}}' ${FLAGS}
 
 [arg('project', help="Which project to build")]
 [arg('mode', help="The optimization mode to use")]
@@ -31,8 +33,11 @@ build project mode='debug': (configure project mode)
 	direnv exec '{{project}}' \
 		ninja -C '{{project}}/build-{{mode}}'
 
+[arg('project', help="Which project to test")]
+[arg('mode', help="The optimization mode to use")]
 test project mode='debug': (build project mode)
-    meson test -C "{{project}}/build-{{mode}}"
+	direnv exec '{{project}}' \
+		meson test -C "{{project}}/build-{{mode}}"
 
 [arg('project', help="Which project to run")]
 [arg('mode', help="The optimization mode to use")]
@@ -43,10 +48,31 @@ run project mode='debug': (build project mode)
 [arg('project', help="Which project to debug")]
 [arg('mode', help="The optimization mode to use")]
 debug project mode='debug': (build project mode)
-	if [ "{{mode}}" == "release" ]; then; \
-		echo >&2 "Cannot debug a release build"; \
-		exit 1; \
+	#!/usr/bin/env sh
+	set -euo pipefail
+
+	if [ "{{mode}}" == "release" ]; then
+		echo >&2 "Cannot debug a release build";
+		exit 1;
 	fi
+
+	if [ "{{os()}}" = "macos" && -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+		dev_dir="$(excode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
+		for candidate in \
+			"$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
+			"$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
+		do
+			if [ -x "$candidate" ]; then
+				export LLDB_DEBUGSERVER_PATH="$candidate"
+	      break
+			fi
+		done
+
+		if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+			echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
+		fi
+	fi
+
 	direnv exec '{{project}}' \
 		lldb '{{project}}/build-{{mode}}/{{project}}'
 
@@ -58,4 +84,4 @@ install project mode='release': (build project mode)
 
 [arg('project', help="Which project to clean")]
 clean project:
-	rm -r '{{project}}/build'*
+	rm -rf '{{project}}/build'*

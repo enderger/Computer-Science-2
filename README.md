@@ -46,6 +46,7 @@ macOS requires an extra step of installing all the extensions.
 2. Install all the recommended extensions (the workspace is configured to provide everything needed for them)
 3. Restart `codium` (make sure to close it all the way)
 4. Reload the environment from `direnv` (it's a little notification, it gives you everything needed to develop each project)
+5. Run `just configure` to set up the ClangD compilation database
 
 #### Anything Else
 We provide a plugin bundle for WSL and Linux that has a working C++ environment built in.
@@ -61,10 +62,7 @@ We provide a plugin bundle for WSL and Linux that has a working C++ environment 
 This repository makes use of the Meson build system, Just command runner, and Clang toolchain.
 To get access to these tools, a Direnv shell is provided. Run `direnv allow` in the source directory (see [the setup section](#setup) if you do not have `nix` and `direnv` installed) and let the system install everything for development.
 
-### Testing
-To build the test suites, run `nix flake check` or `just assignments test`
-
-### Debug
+### Build (Debug)
 #### Assignments
 To build the assignments in debug mode, run `just assignments build [<MODE>]`
 This can do a variety of debug and release builds, see the `justfile` for more information
@@ -73,11 +71,24 @@ This can do a variety of debug and release builds, see the `justfile` for more i
 To build a project in debug mode, run `just projects build <PROJECT> [<MODE>]`
 This can do a variety of debug and release builds, see the `justfile` for more information
 
-### Release
+### Build (Release)
 - To build the packaged version of the assignments, run `nix build`. This builds all assignments into one output directory (`result/bin`). 
 - To build a project, run `nix build .#<PROJECT>`.
 - In either case, the result will be in `result/bin`
 - Projects are built using `meson` and with library dependencies handled through `nix`.
+
+### Testing
+To build the test suites, run `nix flake check` or `just assignments test` / `just projects <PROJECT> test`
+
+### Running / Debugging
+To run a project/assignment, use the `run` subcommand.
+To debug a project/assignment in LLDB, use the `debug` subcoommand
+
+On macOS, you may need to set the debug server path. To do this, use the following command:
+```bash
+export LLDB_DEBUGSERVER_PATH="$(xcode-select -p)/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver"
+```
+If this turns up empty, you'll need the XCode CLI tools (`xcode-select --install`)
 
 ## AI Usage Disclosure
 A large portion of this repository was made with the assistance of AI. This has always taken the form of Claude (not Claude Code, just Claude) interacting with me and helping me write better code. It has not taken the form of the AI coding for me outside of commits explicitly labelled `ai:` and those have always been small single file scripts generated in a chat session.
