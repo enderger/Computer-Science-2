@@ -1,5 +1,4 @@
 # Copyright 2026 Danielle Hutzley
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -273,14 +272,14 @@
             pname = "compsci2-picker";
             version = "0.1.0";
             dontUnpack = true;
-            src = ./assignments/picker.scm;
+            src = ./assignments/picker.rkt;
             nativeBuildInputs = [ pkgs.makeWrapper ];
             installPhase = ''
               install -Dm755 "$src" "$out/bin/compsci2-picker"
               wrapProgram "$out/bin/compsci2-picker" \
                 --prefix PATH : ${
                   pkgs.lib.makeBinPath [
-                    pkgs.guile
+                    pkgs.racket
                     pkgs.fzf
                   ]
                 } \
