@@ -55,7 +55,7 @@
         nix-tools = [
           pkgs.nixd
         ];
-      in racket-tools ++ cpp-tools ++ nix-tools;
+      in racket-tools ++ cpp-tools ++ nix-tools ++ [ pkgs.git ];
 
       inherit system inputs;
     };
@@ -254,17 +254,12 @@
     };
 
     devShells = forEachSupportedSystem ({ pkgs, llvm, system, dev-tools, ... }: let
-      basePackages = dev-tools ++ [
-        self.packages.${system}.codium
-        self.packages.${system}.codium-vim
-      ];
-
       mkProjectShell = name: let
         def = projectDefinition system name;
       in pkgs.mkShell.override
         { inherit (llvm) stdenv; }
         (extendDerivationAttrs
-          { nativeBuildInputs = basePackages; }
+          { nativeBuildInputs = dev-tools; }
           def
         );
 
@@ -273,7 +268,7 @@
         default = pkgs.mkShell.override {
           stdenv = llvm.stdenv;
         } {
-          nativeBuildInputs = basePackages;
+          nativeBuildInputs = dev-tools;
         };
       });
   };

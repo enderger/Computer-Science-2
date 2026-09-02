@@ -79,18 +79,26 @@ limitations under the License.
 (provide display-to-file-if-nonexistent)
 (: display-to-file-if-nonexistent (-> Path String Void))
 (define (display-to-file-if-nonexistent file line)
-  (let* ([existing-lines (if (file-exists? file)
-                             (file->lines file)
-                             '())]
-         [contains-line (member line existing-lines)]
-         [ends-in-newline (equal? (last existing-lines) "")])
-    (with-output-to-file file #:exists 'append
-      (lambda ()
-        (unless contains-line
-          (unless ends-in-newline
-            (newline)
-            (display-to-file (string-append line "\n") file #:exists 'append)))))))
-
+  (let ([insert-separator
+         (if (file-exists? file)
+             (with-input-from-file file
+               (lambda ()
+                 (let loop : (Option String) ()
+                   (let ([in-line : (U EOF String) (read-line)])
+                     (cond
+                       [(eof-object? in-line)
+                        (define size (file-position (current-input-port)))
+                        (if (zero? size) ""
+                            (begin
+                              (file-position (current-input-port) (sub1 size))
+                              (if (eqv? (read-byte) 10) "" "\n")))]
+                      [(string=? in-line line) #f]
+                      [else (loop)])))))
+             "")])
+    (when insert-separator
+      (with-output-to-file file #:exists 'append
+        (lambda ()
+          (display (string-append insert-separator line "\n")))))))
 
 ; Substitute a template in this text
 (provide substitute-placeholder)
@@ -198,10 +206,85 @@ limitations under the License.
 
 ; CLI
 ; Command line argument parsing
-(command-line
-  #:program "compsci2-init"
-  #:args (week problem)
-  (init-templates! (make-object app-data%
-                                (cast week String)
-                                (cast problem String))))
+(module+ main
+  (command-line
+    #:program "compsci2-init"
+    #:args (week problem)
+    (init-templates! (make-object app-data%
+                                  (cast week String)
+                                  (cast problem String)))))
 
+
+; TESTS
+(module+ test
+  (require typed/rackunit)
+
+  ; Run `body` against a temp file seeded with `initial`, return the result.
+  (: with-temp-file (-> (Option String) (-> Path Void) String))
+  (define (with-temp-file initial body)
+    (define path (make-temporary-file))
+    (dynamic-wind
+      void
+      (lambda ()
+        (if initial
+            (display-to-file initial path #:exists 'truncate)
+            (delete-file path))
+        (body path)
+        (if (file-exists? path) (file->string path) ""))
+      (lambda () (when (file-exists? path) (delete-file path)))))
+
+  (: append-subdir (-> (Option String) String))
+  (define (append-subdir initial)
+    (with-temp-file initial
+      (lambda ([p : Path]) (display-to-file-if-nonexistent p "subdir('week5')"))))
+
+  (test-case "appends to a file already ending in a newline"
+    (check-equal? (append-subdir "subdir('week1')\n")
+                  "subdir('week1')\nsubdir('week5')\n"))
+
+  (test-case "inserts a separator when the file lacks a trailing newline"
+    (check-equal? (append-subdir "subdir('week1')")
+                  "subdir('week1')\nsubdir('week5')\n"))
+
+  (test-case "never concatenates onto the previous line"
+    (check-false (regexp-match? #rx"\\)subdir" (append-subdir "subdir('week1')"))))
+
+  (test-case "preserves an existing trailing blank line"
+    (check-equal? (append-subdir "subdir('week1')\n\n")
+                  "subdir('week1')\n\nsubdir('week5')\n"))
+
+  (test-case "is idempotent when the line is already present"
+    (define seeded "subdir('week1')\nsubdir('week5')\n")
+    (check-equal? (append-subdir seeded) seeded))
+
+  (test-case "matches whole lines, not substrings"
+    (check-equal? (append-subdir "subdir('week55')\n")
+                  "subdir('week55')\nsubdir('week5')\n"))
+
+  (test-case "creates the file when it does not exist"
+    (check-equal? (append-subdir #f) "subdir('week5')\n"))
+
+  (test-case "creates content for an empty file without a leading blank line"
+    (check-equal? (append-subdir "") "subdir('week5')\n"))
+
+  ; --- placeholder substitution ---
+  (define data (make-object app-data% "5" "1"))
+
+  (test-case "substitutes week and problem placeholders"
+    (check-equal? (substitute-placeholders data "week@@WEEK@@-problem@@PROBLEM@@")
+                  "week5-problem1"))
+
+  (test-case "substitutes every occurrence, not just the first"
+    (check-equal? (substitute-placeholders data "@@WEEK@@ @@WEEK@@")
+                  "5 5"))
+
+  (test-case "week directory derives from the week"
+    (check-equal? (send data get-week-directory) (string->path "week5")))
+
+  (test-case "fill-path-separator expands @@PATHSEP@@ into a real path"
+    (check-equal? (fill-path-separator (string->path "include@@PATHSEP@@a.hpp"))
+                  (build-path "include" "a.hpp")))
+
+  (test-case "fill-path-separator leaves separator-free names alone"
+    (check-equal? (fill-path-separator (string->path "a.cpp"))
+                  (build-path "a.cpp"))))
