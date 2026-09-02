@@ -197,7 +197,7 @@ limitations under the License.
        (with-output-to-file target-path #:exists 'append
          (lambda ()
            (unless target-exists
-             (displayln template))
+             (display template))
            (when (file-exists? append-template-path)
              (let ([append-template (~> append-template-path
                                         file->string
