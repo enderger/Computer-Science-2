@@ -14,72 +14,72 @@
 #
 BASE := justfile_directory()
 
+[arg('mode', help="The optimization mode to use")]
 [arg('project', help="Which project to configure")]
-[arg('mode', help="The optimization mode to use")]
 configure project mode='debug':
-	case '{{mode}}' in \
-		"debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0";; \
-		"thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1";; \
-		"release") export FLAGS="--buildtype=release";; \
-	esac && \
-	direnv exec '{{project}}' \
-		meson setup '{{project}}/build-{{mode}}' '{{project}}' ${FLAGS}
+    case '{{ mode }}' in \
+        "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0";; \
+        "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1";; \
+        "release") export FLAGS="--buildtype=release";; \
+    esac && \
+    direnv exec '{{ project }}' \
+        meson setup '{{ project }}/build-{{ mode }}' '{{ project }}' ${FLAGS}
 
+[arg('mode', help="The optimization mode to use")]
 [arg('project', help="Which project to build")]
-[arg('mode', help="The optimization mode to use")]
 build project mode='debug': (configure project mode)
-	direnv exec '{{project}}' \
-		ninja -C '{{project}}/build-{{mode}}'
+    direnv exec '{{ project }}' \
+        ninja -C '{{ project }}/build-{{ mode }}'
 
+[arg('mode', help="The optimization mode to use")]
 [arg('project', help="Which project to test")]
-[arg('mode', help="The optimization mode to use")]
 test project mode='debug': (build project mode)
-	direnv exec '{{project}}' \
-		meson test -C "{{project}}/build-{{mode}}"
+    direnv exec '{{ project }}' \
+        meson test -C "{{ project }}/build-{{ mode }}"
 
+[arg('mode', help="The optimization mode to use")]
 [arg('project', help="Which project to run")]
-[arg('mode', help="The optimization mode to use")]
 run project mode='debug': (build project mode)
-	direnv exec '{{project}}' \
-		'{{project}}/build-{{mode}}/{{project}}'
+    direnv exec '{{ project }}' \
+        '{{ project }}/build-{{ mode }}/{{ project }}'
 
+[arg('mode', help="The optimization mode to use")]
 [arg('project', help="Which project to debug")]
-[arg('mode', help="The optimization mode to use")]
 debug project mode='debug': (build project mode)
-	#!/usr/bin/env sh
-	set -euo pipefail
+    #!/usr/bin/env sh
+    set -euo pipefail
 
-	if [ "{{mode}}" == "release" ]; then
-		echo >&2 "Cannot debug a release build";
-		exit 1;
-	fi
+    if [ "{{ mode }}" == "release" ]; then
+        echo >&2 "Cannot debug a release build";
+        exit 1;
+    fi
 
-	if [ "{{os()}}" = "macos" && -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-		dev_dir="$(excode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
-		for candidate in \
-			"$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
-			"$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
-		do
-			if [ -x "$candidate" ]; then
-				export LLDB_DEBUGSERVER_PATH="$candidate"
-	      break
-			fi
-		done
+    if [ "{{ os() }}" = "macos" && -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+        dev_dir="$(excode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
+        for candidate in \
+            "$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
+            "$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
+        do
+            if [ -x "$candidate" ]; then
+                export LLDB_DEBUGSERVER_PATH="$candidate"
+          break
+            fi
+        done
 
-		if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-			echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
-		fi
-	fi
+        if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+            echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
+        fi
+    fi
 
-	direnv exec '{{project}}' \
-		lldb '{{project}}/build-{{mode}}/{{project}}'
+    direnv exec '{{ project }}' \
+        lldb '{{ project }}/build-{{ mode }}/{{ project }}'
 
-[arg('project', help="Which project to install")]
 [arg('mode', help="The optimization mode to use")]
+[arg('project', help="Which project to install")]
 install project mode='release': (build project mode)
-	direnv exec '{{project}}' \
-		meson install -C '{{project}}/build-{{mode}}'
+    direnv exec '{{ project }}' \
+        meson install -C '{{ project }}/build-{{ mode }}'
 
 [arg('project', help="Which project to clean")]
 clean project:
-	rm -rf '{{project}}/build'*
+    rm -rf '{{ project }}/build'*

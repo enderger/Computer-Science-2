@@ -16,64 +16,62 @@ BUILDDIR := env("BUILDDIR", 'build')
 
 [arg('mode', help="The optimization mode to use")]
 configure mode='debug':
-	# THIS IS INTENTIONALLY UNQUOTED, THE ARGS ARE MEANT TO BE INTERPRETED AS A LIST.
-	case '{{mode}}' in \
-		"debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Dcpp_args=-fno-sanitize-recover=undefined``";; \
-		"thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Dcpp_args=-fno-sanitize-recover=undefined";; \
-		"release") export FLAGS="--buildtype=release";; \
-	esac && \
-	meson setup '{{BUILDDIR}}-{{mode}}' ${FLAGS}
+    # THIS IS INTENTIONALLY UNQUOTED, THE ARGS ARE MEANT TO BE INTERPRETED AS A LIST.
+    case '{{ mode }}' in \
+        "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Dcpp_args=-fno-sanitize-recover=undefined``";; \
+        "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Dcpp_args=-fno-sanitize-recover=undefined";; \
+        "release") export FLAGS="--buildtype=release";; \
+    esac && \
+    meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS}
 
 [arg('mode', help="The optimization mode to use")]
 build mode='debug': (configure mode)
-	ninja -C '{{BUILDDIR}}-{{mode}}'
+    ninja -C '{{ BUILDDIR }}-{{ mode }}'
 
 [arg('mode', help="The optimization mode to use")]
 test mode='debug': (build mode)
-	meson test -C "{{BUILDDIR}}-{{mode}}"
+    meson test -C "{{ BUILDDIR }}-{{ mode }}"
 
 [arg('executable', help="The executable to run")]
 [arg('mode', help="The optimization mode to use")]
 run executable mode='debug': (build mode)
-	export EXE="$(echo "{{executable}}" | sed -E 's|([^-]*).*|\1/&|')" && \
-	"{{BUILDDIR}}-{{mode}}/${EXE}"
+    export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
+    "{{ BUILDDIR }}-{{ mode }}/${EXE}"
 
 [arg('executable', help="The executable to debug")]
 [arg('mode', help="The optimization mode to use")]
 debug executable mode='debug': (build mode)
-	#!/usr/bin/env sh
-	set -eu
+    #!/usr/bin/env sh
+    set -eu
 
-	if [ "{{mode}}" = "release" ]; then
-		echo >&2 "Cannot debug a release build";
-		exit 1;
-	fi
+    if [ "{{ mode }}" = "release" ]; then
+        echo >&2 "Cannot debug a release build";
+        exit 1;
+    fi
 
-	if [ "{{os()}}" = "macos" ] && [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-		dev_dir="$(xcode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
-		for candidate in \
-			"$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
-			"$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
-		do
-			if [ -x "$candidate" ]; then
-				export LLDB_DEBUGSERVER_PATH="$candidate"
-				break
-			fi
-		done
+    if [ "{{ os() }}" = "macos" ] && [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+        dev_dir="$(xcode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
+        for candidate in \
+            "$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
+            "$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
+        do
+            if [ -x "$candidate" ]; then
+                export LLDB_DEBUGSERVER_PATH="$candidate"
+                break
+            fi
+        done
 
-		if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-			echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
-		fi
-	fi
+        if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+            echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
+        fi
+    fi
 
-	export EXE="$(echo "{{executable}}" | sed -E 's|([^-]*).*|\1/&|')" && \
-	lldb "{{BUILDDIR}}-{{mode}}/${EXE}"
-
+    export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
+    lldb "{{ BUILDDIR }}-{{ mode }}/${EXE}"
 
 [arg('mode', help="The optimization mode to use")]
 install mode='release': (build mode)
-	meson install -C "{{BUILDDIR}}-{{mode}}"
+    meson install -C "{{ BUILDDIR }}-{{ mode }}"
 
 clean:
-	rm -rf '{{BUILDDIR}}'*
-
+    rm -rf '{{ BUILDDIR }}'*

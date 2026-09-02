@@ -17,10 +17,10 @@ mod assignments
 mod projects
 
 default:
-	@just --list
+    @just --list
 
-	@echo "# Assignments"
-	@just --list assignments
+    @echo "# Assignments"
+    @just --list assignments
 
-	@echo "# Projects"
-	@just --list projects
+    @echo "# Projects"
+    @just --list projects
