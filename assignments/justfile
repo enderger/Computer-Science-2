@@ -21,6 +21,7 @@ configure mode='debug':
         "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "release") export FLAGS="--buildtype=release";; \
+        *) echo >&2 "Error: Please select a build type of 'debug', 'thread-debug', or 'release'"; exit 1;; \
     esac && \
     meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS}
 
