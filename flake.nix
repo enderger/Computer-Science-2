@@ -298,7 +298,7 @@
             installPhase = ''
               install -Dm755 $src $out/bin/compsci2-init
               wrapProgram $out/bin/compsci2-init \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.racket ]}
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.racket pkgs.meson pkgs.clang-format ]}
             '';
             meta.mainProgram = "compsci2-init";
           };
@@ -325,6 +325,7 @@
             mesonFlags = [
               "-Db_sanitize=address,undefined"
               "-Dcpp_args=-fno-sanitize-recover=undefined"
+              "-Db_lundef=false"
             ];
             doCheck = true;
           });

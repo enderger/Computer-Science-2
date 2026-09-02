@@ -18,8 +18,8 @@ BUILDDIR := env("BUILDDIR", 'build')
 configure mode='debug':
     # THIS IS INTENTIONALLY UNQUOTED, THE ARGS ARE MEANT TO BE INTERPRETED AS A LIST.
     case '{{ mode }}' in \
-        "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Dcpp_args=-fno-sanitize-recover=undefined``";; \
-        "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Dcpp_args=-fno-sanitize-recover=undefined";; \
+        "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
+        "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "release") export FLAGS="--buildtype=release";; \
     esac && \
     meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS}
@@ -36,34 +36,35 @@ test mode='debug': (build mode)
 [arg('mode', help="The optimization mode to use")]
 run executable mode='debug': (build mode)
     export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
-    "{{ BUILDDIR }}-{{ mode }}/${EXE}"
+        "{{ BUILDDIR }}-{{ mode }}/${EXE}"
 
 [arg('executable', help="The executable to debug")]
 [arg('mode', help="The optimization mode to use")]
 debug executable mode='debug': (build mode)
     #!/usr/bin/env sh
     set -eu
-
     if [ "{{ mode }}" = "release" ]; then
-        echo >&2 "Cannot debug a release build";
-        exit 1;
+      echo >&2 "Cannot debug a release build";
+      exit 1;
     fi
 
     if [ "{{ os() }}" = "macos" ] && [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-        dev_dir="$(xcode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
-        for candidate in \
-            "$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
-            "$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
-        do
-            if [ -x "$candidate" ]; then
-                export LLDB_DEBUGSERVER_PATH="$candidate"
-                break
-            fi
-        done
+      dev_dir="$(env -u DEVELOPER_DIR xcode-select -p 2>/dev/null || echo /Library/Developer/CommandLineTools/)"
+      for candidate in \
+          "$dev_dir/Library/PrivateFrameworks/LLDB.framework/Resources/debugserver" \
+          "$dev_dir/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
+      do
+          if [ -x "$candidate" ]; then
+            export LLDB_DEBUGSERVER_PATH="$candidate"
+            break
+          fi
+      done
 
-        if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
-            echo >&2 "Warning: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
-        fi
+      if [ -z "${LLDB_DEBUGSERVER_PATH:-}" ]; then
+        echo >&2 "Error: no debugserver found under '$dev_dir', set LLDB_DEBUGSERVER_PATH (see README)"
+        echo >&2 "This is needed to actually debug programs on macOS, thanks Apple."
+        exit 1
+      fi
     fi
 
     export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
