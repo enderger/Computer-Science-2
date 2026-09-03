@@ -297,7 +297,13 @@
             installPhase = ''
               install -Dm755 $src $out/bin/compsci2-init
               wrapProgram $out/bin/compsci2-init \
-                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.racket pkgs.meson llvm.clang-tools ]}
+                --prefix PATH : ${
+                  pkgs.lib.makeBinPath [
+                    pkgs.racket
+                    pkgs.meson
+                    llvm.clang-tools
+                  ]
+                }
             '';
             meta.mainProgram = "compsci2-init";
           };
@@ -320,7 +326,7 @@
 
       checks = forEachSupportedSystem (
         { pkgs, system, ... }: {
-          assignments = self.packages.${system}.assignments.overrideAttrs (old: {
+          assignments = self.packages.${system}.assignments.overrideAttrs (_: {
             mesonFlags = [
               "-Db_sanitize=address,undefined"
               "-Dcpp_args=-fno-sanitize-recover=undefined"
@@ -331,7 +337,30 @@
 
           scripts = pkgs.runCommand "compsci2-script-tests" { nativeBuildInputs = [ pkgs.racket ]; } ''
             raco test ${./assignments}/init.rkt
+            raco test ${./assignments}/picker.rkt
             touch $out
+          '';
+        }
+      );
+
+      formatter = forEachSupportedSystem (
+        { pkgs, llvm, ... }:
+        pkgs.writeShellApplication {
+          name = "compsci2-fmt";
+          runtimeInputs = [
+            pkgs.git
+            llvm.clang-tools
+            pkgs.meson
+            pkgs.just
+            pkgs.nixfmt-tree
+          ];
+          text = ''
+            cd "$(git rev-parse --show-toplevel)"
+            git ls-files -z '*.cpp' '*.hpp' '*.cppm' '*.c' ':(exclude,glob)**/template*/**' | xargs -0 -r clang-format -i
+            git ls-files -z '*meson.build' ':(exclude,glob)**/template*/**' | xargs -0 -r -n1 meson format -i
+            git ls-files -z '*justfile' ':(exclude,glob)**/template*/**' | xargs -0 -r -n1 just --fmt -f
+            # TODO: Consider moving to treefmt wholesale
+            ${pkgs.lib.getExe pkgs.nixfmt-tree}
           '';
         }
       );
@@ -354,13 +383,15 @@
           ...
         }:
         let
+          basePackages = dev-tools ++ [ self.formatter.${system} ];
+
           mkProjectShell =
             name:
             let
               def = projectDefinition system name;
             in
             pkgs.mkShell.override { inherit (llvm) stdenv; } (
-              extendDerivationAttrs { nativeBuildInputs = dev-tools; } def
+              extendDerivationAttrs { nativeBuildInputs = basePackages; } def
             );
 
           projectDevShells = nixpkgs.lib.genAttrs projectNames mkProjectShell;
@@ -370,10 +401,10 @@
           default =
             pkgs.mkShell.override
               {
-                stdenv = llvm.stdenv;
+                inherit (llvm) stdenv;
               }
               {
-                nativeBuildInputs = dev-tools;
+                nativeBuildInputs = basePackages;
               };
         }
       );

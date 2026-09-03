@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-project('compsci2-assignments', 'cpp',
-  version : '0.0.0',
-  default_options : [
-    'cpp_std=c++23',
-    'warning_level=3',
-    'werror=true'
-  ]
+project(
+    'compsci2-assignments',
+    'cpp',
+    version: '0.0.0',
+    default_options: ['cpp_std=c++23', 'warning_level=3', 'werror=true'],
 )
 
 subdir('week1')

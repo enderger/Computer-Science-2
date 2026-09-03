@@ -26,5 +26,4 @@ default:
     @just --list projects
 
 fmt:
-    cd "$(git rev-parse --show-toplevel)" && \
-        git ls-files -z '*.cpp' '*.hpp' | xargs -0 clang-format -i
+    compsci2-formatter
