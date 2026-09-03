@@ -4,3 +4,4 @@ build*/
 /result
 /result-*
 compiled/
+.pre-commit-config.yaml

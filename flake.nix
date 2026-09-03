@@ -331,7 +331,7 @@
               statix check . || status=1
 
               # Racket
-              git ls-files -z "*.rkt" | xargs -0 -r raco make || status=1
+              git ls-files -z "*.rkt" | xargs -0 -r raco test || status=1
 
               exit "$status"
             '';
@@ -369,6 +369,38 @@
             raco test ${./assignments}/picker.rkt
             touch $out
           '';
+
+          hooks = git-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = {
+              # Nix
+              deadnix.enable = true;
+              nixfmt.enable = true;
+              statix.enable = true;
+              nil.enable = true;
+              flake-checker.enable = true;
+
+              # Racket
+              racket-test = {
+                enable = true;
+                name = "Racket test";
+                entry = "${pkgs.racket}/bin/raco test";
+                files = ".*\\.rkt";
+                pass_filenames = true;
+              };
+
+              # Other
+              typos.enable = true;
+              lint = {
+                enable = true;
+                name = "General lints";
+                entry = pkgs.lib.getExe self.packages.${system}.lint;
+                pass_filenames = false;
+                always_run = true;
+                stages = [ "pre-push" ];
+              };
+            };
+          };
         }
       );
 
@@ -426,10 +458,13 @@
           ...
         }:
         let
-          basePackages = dev-tools ++ [
-            self.formatter.${system}
-            self.packages.${system}.lint
-          ];
+          basePackages =
+            dev-tools
+            ++ self.checks.${system}.hooks.enabledPackages
+            ++ [
+              self.formatter.${system}
+              self.packages.${system}.lint
+            ];
 
           mkProjectShell =
             name:
@@ -437,7 +472,10 @@
               def = projectDefinition system name;
             in
             pkgs.mkShell.override { inherit (llvm) stdenv; } (
-              extendDerivationAttrs { nativeBuildInputs = basePackages; } def
+              (extendDerivationAttrs { nativeBuildInputs = basePackages; } def)
+              // {
+                inherit (self.checks.${system}.hooks) shellHook;
+              }
             );
 
           projectDevShells = nixpkgs.lib.genAttrs projectNames mkProjectShell;
@@ -450,6 +488,7 @@
                 inherit (llvm) stdenv;
               }
               {
+                inherit (self.checks.${system}.hooks) shellHook;
                 nativeBuildInputs = basePackages;
               };
         }
