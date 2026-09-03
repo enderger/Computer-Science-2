@@ -17,7 +17,6 @@
  */
 #include <format>
 #include <string>
-#include <string_view>
 
 #include <doctest/doctest.h>
 
@@ -25,15 +24,33 @@
 
 using namespace std::string_view_literals;
 
+// HELPERS
+namespace {
+// HACK: This is just a testable version of printInfo used for testing purposes
+constexpr auto _formatEmployee(std::string name, double baseSalary)
+    -> std::string {
+    return std::format("I'm {} and I make a base salary of ${}", name,
+                       baseSalary);
+}
+} // namespace
+
 // IMPLEMENTATION
-// TODO: Implement the solution here
-auto hutzdog_cs2_week3::get_greeting(std::string_view who) -> std::string {
-    return std::format("Hello, {}!", who);
+void hutzdog_cs2_week3::Employee::printInfo() const {
+    std::println("{}", _formatEmployee(this->name, this->baseSalary));
+}
+
+[[nodiscard]] constexpr auto
+hutzdog_cs2_week3::Manager::totalCompensation() const -> double {
+    return baseSalary * (1.0 + bonusPercentage / 100.0);
 }
 
 // TESTS
-// TODO: Implement the tests here
-TEST_CASE("testing the get_greeting function") {
-    CHECK(hutzdog_cs2_week3::get_greeting("World") == "Hello, World!");
-    CHECK(hutzdog_cs2_week3::get_greeting("Professor") == "Hello, Professor!");
+TEST_CASE("testing the Employee class's formatting") {
+    CHECK_EQ(_formatEmployee("Sullivan", 14.42),
+             "I'm Sullivan and I make a base salary of $14.42");
+}
+TEST_CASE("testing the Manager's salary computation") {
+    CHECK_EQ(hutzdog_cs2_week3::Manager("Mr. Waternoose", 24.84, 100.0)
+                 .totalCompensation(),
+             49.68);
 }
