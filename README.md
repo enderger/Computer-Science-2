@@ -1,5 +1,6 @@
 # My Computer Science 2 Monorepo
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 By Hutzdog (Danielle Hutzley)
 
 ## Setup
@@ -69,6 +70,7 @@ This can do a variety of debug and release builds, see the `justfile` for more i
 
 #### Projects
 To build a project in debug mode, run `just projects build <PROJECT> [<MODE>]`
+
 This can do a variety of debug and release builds, see the `justfile` for more information
 
 ### Build (Release)
@@ -81,8 +83,8 @@ This can do a variety of debug and release builds, see the `justfile` for more i
 To build the test suites, run `nix flake check` or `just assignments test` / `just projects <PROJECT> test`
 
 ### Running / Debugging
-To run a project/assignment, use the `run` subcommand.
-To debug a project/assignment in LLDB, use the `debug` subcoommand
+- To run a project/assignment, use the `run` subcommand.
+- To debug a project/assignment in LLDB, use the `debug` subcoommand
 
 On macOS, you may need to set the debug server path. To do this, use the following command:
 ```bash

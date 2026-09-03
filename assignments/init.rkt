@@ -137,6 +137,21 @@ limitations under the License.
 (define (has-append-template? file-name)
   (and (member file-name (filter/templates APPENDS-DIR)) #t))
 
+; Format a generated file in place, provided the file type has a formatter
+; This resolves any formatting bugs otherwise unresolvable in the template
+; For example, bugs caused by different line length
+(provide format-target!)
+(: format-target! (-> Path Void))
+(define (format-target! target)
+  (define ext (bytes->string/utf-8 (or (path-get-extension target) #"")))
+  (cond
+    [(member ext '(".c" ".cpp" ".h" ".hpp" ".cc" ".cppm"))
+     (let ([exe (find-executable-path "clang-format")])
+       (when exe (void (system* exe "-i" target))))]
+    [(string=? ext ".build")
+     (let ([exe (find-executable-path "meson")])
+       (when exe (void (system* exe "format" "-i" target))))]))
+
 ; ENTRYPOINT
 (provide init-templates!)
 (: init-templates! (-> (Instance AppData%) Void))
@@ -197,12 +212,15 @@ limitations under the License.
        (with-output-to-file target-path #:exists 'append
          (lambda ()
            (unless target-exists
-             (displayln template))
+             (display template))
            (when (file-exists? append-template-path)
              (let ([append-template (~> append-template-path
                                         file->string
                                         (substitute-placeholders app-data))])
-               (displayln append-template)))))))))
+               (displayln append-template)))))
+
+       (format-target! target-path)))))
+
 
 ; CLI
 ; Command line argument parsing
