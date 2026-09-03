@@ -26,4 +26,7 @@ default:
     @just --list projects
 
 fmt:
-    compsci2-formatter
+    compsci2-fmt
+
+lint:
+    compsci2-lint

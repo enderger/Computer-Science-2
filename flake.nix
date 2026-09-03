@@ -78,7 +78,7 @@
       forEachSupportedSystem =
         f:
         let
-          lib = nixpkgs.lib;
+          inherit (nixpkgs) lib;
         in
         lib.genAttrs supportedSystems (
           lib.flip lib.pipe [
@@ -88,7 +88,7 @@
         );
 
       projectNames = builtins.attrNames (
-        nixpkgs.lib.filterAttrs (name: type: type == "directory") (builtins.readDir ./projects)
+        nixpkgs.lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./projects)
       );
       projectDefinition =
         system: name:
@@ -109,7 +109,7 @@
         };
     in
     {
-      schemas = flake-schemas.schemas;
+      inherit (flake-schemas) schemas;
 
       packages = forEachSupportedSystem (
         {
@@ -308,6 +308,35 @@
             meta.mainProgram = "compsci2-init";
           };
 
+          lint = pkgs.writeShellApplication {
+            name = "compsci2-lint";
+            runtimeInputs = [
+              self.formatter.${system}
+
+              pkgs.deadnix
+              pkgs.git
+              pkgs.racket
+              pkgs.statix
+            ];
+
+            text = ''
+              status=0
+              cd "$(git rev-parse --show-toplevel)"
+
+              # General
+              compsci2-fmt --check || status=1
+
+              # Nix
+              git ls-files -z "*.nix" | xargs -0 -r deadnix -f || status=1
+              statix check . || status=1
+
+              # Racket
+              git ls-files -z "*.rkt" | xargs -0 -r raco make || status=1
+
+              exit "$status"
+            '';
+          };
+
           codium = mkWrappedCodium "cs2-codium" [ ];
           codium-vim = mkWrappedCodium "cs2-codium-vim" [ codiumExtensions.vscodevim.vim ];
 
@@ -352,15 +381,29 @@
             llvm.clang-tools
             pkgs.meson
             pkgs.just
-            pkgs.nixfmt-tree
+            pkgs.nixfmt
           ];
           text = ''
+            status=0
+            if [ "''${1:-}" = "--check" ]; then
+              clang_format_args=(--dry-run -Werror)
+              meson_args=(--check-only)
+              just_args=(--check)
+              nixfmt_args=(--check)
+            else
+              clang_format_args=(-i)
+              meson_args=(-i)
+              just_args=()
+              nixfmt_args=()
+            fi
+
             cd "$(git rev-parse --show-toplevel)"
-            git ls-files -z '*.cpp' '*.hpp' '*.cppm' '*.c' ':(exclude,glob)**/template*/**' | xargs -0 -r clang-format -i
-            git ls-files -z '*meson.build' ':(exclude,glob)**/template*/**' | xargs -0 -r -n1 meson format -i
-            git ls-files -z '*justfile' ':(exclude,glob)**/template*/**' | xargs -0 -r -n1 just --fmt -f
-            # TODO: Consider moving to treefmt wholesale
-            ${pkgs.lib.getExe pkgs.nixfmt-tree}
+            EXCLUDE_GLOB=':(exclude,glob)**/template*/**'
+            git ls-files -z '*.cpp' '*.hpp' '*.cppm' '*.c' "$EXCLUDE_GLOB" | xargs -0 -r clang-format "''${clang_format_args[@]}" || status=1
+            git ls-files -z '*meson.build' "$EXCLUDE_GLOB" | xargs -0 -r -n1 meson format "''${meson_args[@]}" || status=1
+            git ls-files -z '*justfile' "$EXCLUDE_GLOB" | xargs -0 -r -n1 just --fmt "''${just_args[@]}" -f || status=1
+            git ls-files -z '*.nix' "$EXCLUDE_GLOB" | xargs -0 -r nixfmt "''${nixfmt_args[@]}" || status=1
+            exit "$status"
           '';
         }
       );
@@ -383,7 +426,10 @@
           ...
         }:
         let
-          basePackages = dev-tools ++ [ self.formatter.${system} ];
+          basePackages = dev-tools ++ [
+            self.formatter.${system}
+            self.packages.${system}.lint
+          ];
 
           mkProjectShell =
             name:
