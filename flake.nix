@@ -389,6 +389,16 @@
                 pass_filenames = true;
               };
 
+              # C/C++
+              clang-format = {
+                enable = true;
+                types_or = pkgs.lib.mkForce [
+                  "c"
+                  "c++"
+                ];
+                excludes = [ ".*/template.*/" ];
+              };
+
               # Other
               typos.enable = true;
               lint = {
@@ -397,7 +407,10 @@
                 entry = pkgs.lib.getExe self.packages.${system}.lint;
                 pass_filenames = false;
                 always_run = true;
-                stages = [ "pre-push" ];
+                stages = [
+                  "pre-push"
+                  "manual"
+                ];
               };
             };
           };
