@@ -38,3 +38,24 @@ executable(
     install: true,
 )
 
+test(
+    'week3-problem2',
+    executable(
+        'week3-problem2-tests',
+        'week3-problem2.cpp',
+        cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
+        dependencies: doctest_dep,
+        include_directories: incdir,
+    ),
+)
+
+executable(
+    'week3-problem2',
+    'week3-problem2.cpp',
+    'week3-problem2-runner.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
+    dependencies: doctest_dep,
+    include_directories: incdir,
+    install: true,
+)
+

@@ -23,7 +23,7 @@ configure mode='debug':
         "release") export FLAGS="--buildtype=release";; \
         *) echo >&2 "Error: Please select a build type of 'debug', 'thread-debug', or 'release'"; exit 1;; \
     esac && \
-    meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS}
+    meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS} --reconfigure
 
 [arg('mode', help="The optimization mode to use")]
 build mode='debug': (configure mode)
