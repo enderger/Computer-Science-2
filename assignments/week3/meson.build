@@ -15,6 +15,7 @@
 # Generated from template
 #
 doctest_dep = dependency('doctest')
+cs2_lib_dep = dependency('cs2_lib', fallback: ['cs2-lib', 'cs2_lib_dep'])
 incdir = include_directories('include')
 
 test(
@@ -23,7 +24,7 @@ test(
         'week3-problem1-tests',
         'week3-problem1.cpp',
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
-        dependencies: doctest_dep,
+        dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
     ),
 )
@@ -33,7 +34,7 @@ executable(
     'week3-problem1.cpp',
     'week3-problem1-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
-    dependencies: doctest_dep,
+    dependencies: [doctest_dep, cs2_lib_dep],
     include_directories: incdir,
     install: true,
 )
@@ -44,7 +45,7 @@ test(
         'week3-problem2-tests',
         'week3-problem2.cpp',
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
-        dependencies: doctest_dep,
+        dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
     ),
 )
@@ -54,7 +55,28 @@ executable(
     'week3-problem2.cpp',
     'week3-problem2-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
-    dependencies: doctest_dep,
+    dependencies: [doctest_dep, cs2_lib_dep],
+    include_directories: incdir,
+    install: true,
+)
+
+test(
+    'week3-problem3',
+    executable(
+        'week3-problem3-tests',
+        'week3-problem3.cpp',
+        cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
+        dependencies: [doctest_dep, cs2_lib_dep],
+        include_directories: incdir,
+    ),
+)
+
+executable(
+    'week3-problem3',
+    'week3-problem3.cpp',
+    'week3-problem3-runner.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
+    dependencies: [doctest_dep, cs2_lib_dep],
     include_directories: incdir,
     install: true,
 )

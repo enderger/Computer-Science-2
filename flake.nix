@@ -222,6 +222,23 @@
               '';
             };
 
+          cs2-lib = pkgs.stdenv.mkDerivation {
+            pname = "cs2-lib";
+            version = "0.1.0";
+            outputs = [
+              "out"
+              "doc"
+            ];
+            src = ./lib;
+            doCheck = true;
+            mesonFlags = [ "--buildtype=release" ];
+
+            nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
+            postBuild = ''
+              substitute-doxygen "$doc" "$src"
+            '';
+          };
+
           mkProject =
             name:
             let
@@ -229,7 +246,10 @@
             in
             llvm.stdenv.mkDerivation (
               extendDerivationAttrs
-                { nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ]; }
+                {
+                  nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ];
+                  buildInputs = [ cs2-lib ];
+                }
                 (
                   {
                     pname = name;
@@ -251,6 +271,7 @@
         in
         projectPackages
         // {
+          inherit cs2-lib;
           assignments = llvm.stdenv.mkDerivation {
             pname = "compsci2-assignments";
             version = "0.1.0";
@@ -263,6 +284,7 @@
             mesonFlags = [ "--buildtype=release" ];
 
             nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
+            buildInputs = [ self.packages.${system}.cs2-lib ];
             postBuild = ''
               substitute-doxygen "$doc" "$src"
             '';
@@ -355,6 +377,14 @@
 
       checks = forEachSupportedSystem (
         { pkgs, system, ... }: {
+          cs2-lib = self.packages.${system}.cs2-lib.overrideAttrs (_: {
+            mesonFlags = [
+              "-Db_sanitize=address,undefined"
+              "-Dcpp_args=-fno-sanitize-recover=undefined"
+              "-Db_lundef=false"
+            ];
+            doCheck = true;
+          });
           assignments = self.packages.${system}.assignments.overrideAttrs (_: {
             mesonFlags = [
               "-Db_sanitize=address,undefined"
