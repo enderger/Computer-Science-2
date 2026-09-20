@@ -22,9 +22,16 @@ project(
     license: 'Apache-2.0',
 )
 
-inc_dir = include_directories('include')
+cpptrace_dep = dependency('cpptrace')
 doctest_dep = dependency('doctest')
+
+inc_dir = include_directories('include')
 src = ['hash.cpp', 'sexp.cpp']
+
+if get_option('buildtype') != 'release'
+    add_project_arguments('-DCS2LIB_DEBUG', language: 'cpp')
+    add_project_dependencies(cpptrace_dep, language: 'cpp')
+endif
 
 cs2_lib = static_library(
     'cs2-lib',
@@ -32,7 +39,7 @@ cs2_lib = static_library(
     include_directories: inc_dir,
     install: true,
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
-    dependencies: [doctest_dep],
+    dependencies: doctest_dep,
 )
 test(
     'cs2-lib',
@@ -41,7 +48,7 @@ test(
         src,
         include_directories: inc_dir,
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
-        dependencies: [doctest_dep],
+        dependencies: [cpptrace_dep, doctest_dep],
     ),
 )
 cs2_lib_dep = declare_dependency(

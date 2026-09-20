@@ -14,5 +14,3 @@
  * limitations under the License.
  */
 #include "cs2lib/sexp.hpp"
-
-using namespace std::string_view_literals;

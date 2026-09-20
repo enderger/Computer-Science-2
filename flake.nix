@@ -59,6 +59,8 @@
               llvm.clang
               llvm.clang-tools
               llvm.lldb
+              pkgs.cmake
+              pkgs.cpptrace
               pkgs.meson
               pkgs.mesonlsp
               pkgs.doctest
