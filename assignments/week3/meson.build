@@ -15,7 +15,7 @@
 # Generated from template
 #
 doctest_dep = dependency('doctest')
-cs2_lib_dep = dependency('cs2_lib', fallback: ['cs2-lib', 'cs2_lib_dep'])
+cs2_lib_dep = dependency('cs2-lib', fallback: ['cs2-lib', 'cs2_lib_dep'])
 incdir = include_directories('include')
 
 test(

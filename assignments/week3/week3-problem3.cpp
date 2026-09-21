@@ -49,8 +49,8 @@ TEST_CASE("testing the Account class") {
 
     SUBCASE("testing stringification") {
         CHECK(std::format("{}", account1) ==
-              "(Account (owner-name . \"Brent\") (balance . 20000))");
+              "(Account (owner-name . \"Brent\") (balance . 20000.00))");
         CHECK(std::format("{}", account2) ==
-              "(Account (owner-name . \"Jai\") (balance . 3000000))");
+              "(Account (owner-name . \"Jai\") (balance . 3000000.00))");
     }
 }

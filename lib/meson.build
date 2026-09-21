@@ -26,7 +26,7 @@ cpptrace_dep = dependency('cpptrace')
 doctest_dep = dependency('doctest')
 
 inc_dir = include_directories('include')
-src = ['hash.cpp', 'sexp.cpp']
+src = ['hash.cpp', 'sexp.cpp', 'util.cpp']
 
 if get_option('buildtype') != 'release'
     add_project_arguments('-DCS2LIB_DEBUG', language: 'cpp')
@@ -41,18 +41,68 @@ cs2_lib = static_library(
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: doctest_dep,
 )
+install_headers(
+    'include/cs2lib/hash.hpp',
+    'include/cs2lib/sexp.hpp',
+    'include/cs2lib/util.hpp',
+    subdir: 'cs2lib',
+)
+
 test(
     'cs2-lib',
     executable(
         'cs2-lib-test',
         src,
+        'test.cpp',
+        cpp_args: [
+            '-DCS2LIB_FULL_FUZZ_DEPTH=1',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=2',
+        ],
         include_directories: inc_dir,
-        cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
         dependencies: [cpptrace_dep, doctest_dep],
     ),
+    suite: 'basic',
+    timeout: 60,
+)
+test(
+    'cs2-lib-test-fuzz',
+    executable(
+        'cs2-lib-fuzz',
+        src,
+        'test.cpp',
+        cpp_args: [
+            '-DCS2LIB_FULL_FUZZ_DEPTH=3',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=3',
+        ],
+        include_directories: inc_dir,
+        dependencies: [cpptrace_dep, doctest_dep],
+    ),
+    timeout: 0,
+    suite: 'fuzz',
+)
+test(
+    'cs2-lib-test-deep',
+    executable(
+        'cs2-lib-deep',
+        src,
+        'test.cpp',
+        cpp_args: [
+            '-DCS2LIB_FULL_FUZZ_DEPTH=4',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=5',
+        ],
+        include_directories: inc_dir,
+        dependencies: [cpptrace_dep, doctest_dep],
+    ),
+    timeout: 0,
+    suite: 'deep',
 )
 cs2_lib_dep = declare_dependency(
     link_with: cs2_lib,
     include_directories: inc_dir,
 )
-import('pkgconfig').generate(cs2_lib)
+import('pkgconfig').generate(
+    cs2_lib,
+    name: 'cs2-lib',
+    description: 'My library for computer science 2 projects',
+    version: '0.1.0',
+)

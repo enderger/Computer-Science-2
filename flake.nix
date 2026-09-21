@@ -122,11 +122,18 @@
           ...
         }:
         let
-          baseTools = [
+          base-tools = [
             llvm.clang
             pkgs.meson
+            pkgs.cmake
             pkgs.ninja
+            pkgs.cpptrace
             pkgs.doctest
+            pkgs.pkg-config
+          ];
+
+          base-depends = [
+            pkgs.cpptrace
             pkgs.pkg-config
           ];
 
@@ -224,7 +231,7 @@
               '';
             };
 
-          cs2-lib = pkgs.stdenv.mkDerivation {
+          cs2-lib = llvm.stdenv.mkDerivation {
             pname = "cs2-lib";
             version = "0.1.0";
             outputs = [
@@ -233,9 +240,12 @@
             ];
             src = ./lib;
             doCheck = true;
+            dontUseCmakeConfigure = true;
             mesonFlags = [ "--buildtype=release" ];
+            mesonCheckFlags = [ "--suite=basic" ];
 
-            nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
+            nativeBuildInputs = base-tools ++ [ (substituteDoxygen { name = "cs2-lib"; }) ];
+            buildInputs = base-depends;
             postBuild = ''
               substitute-doxygen "$doc" "$src"
             '';
@@ -249,8 +259,9 @@
             llvm.stdenv.mkDerivation (
               extendDerivationAttrs
                 {
-                  nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ];
-                  buildInputs = [ cs2-lib ];
+                  nativeBuildInputs = base-tools ++ [ (substituteDoxygen { inherit name; }) ];
+                  buildInputs = base-depends ++ [ cs2-lib ];
+                  dontUseCmakeConfigure = true;
                 }
                 (
                   {
@@ -285,8 +296,11 @@
             doCheck = true;
             mesonFlags = [ "--buildtype=release" ];
 
-            nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
-            buildInputs = [ self.packages.${system}.cs2-lib ];
+            dontUseCmakeConfigure = true;
+            nativeBuildInputs = base-tools ++ [
+              (substituteDoxygen { name = "assignments"; })
+            ];
+            buildInputs = base-depends ++ [ self.packages.${system}.cs2-lib ];
             postBuild = ''
               substitute-doxygen "$doc" "$src"
             '';

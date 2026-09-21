@@ -1,7 +1,7 @@
 build*/
 .cache/
 .direnv/
-/result
-/result-*
+result
+result-*
 compiled/
 .pre-commit-config.yaml

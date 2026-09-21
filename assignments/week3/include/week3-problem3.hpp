@@ -112,9 +112,9 @@ template <> struct std::formatter<hutzdog_cs2_week3::Account> {
     // more compact than JSON
     auto format(const hutzdog_cs2_week3::Account &acct,
                 std::format_context &ctx) const {
-        return std::format_to(ctx.out(),
-                              "(Account (owner-name . \"{}\") (balance . {}))",
-                              acct.ownerName, acct.balance);
+        return std::format_to(
+            ctx.out(), "(Account (owner-name . \"{}\") (balance . {:.2f}))",
+            acct.ownerName, acct.balance);
     }
 };
 

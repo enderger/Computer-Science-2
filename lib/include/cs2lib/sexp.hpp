@@ -18,11 +18,13 @@
 #define HUTZDOG_CS2_LIB_SEXP
 
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <expected>
 #include <format>
 #include <iterator>
 #include <locale>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -43,6 +45,16 @@
 
 #endif // CS2LIB_DEBUG
 
+// HACK: This is needed to demangle certain names for better error reporting
+#if defined(__GNUC__) || defined(__clang__)
+#if __has_include(<cxxabi.h>)
+
+#include <cxxabi.h>
+#define CS2LIB_ITANIUM_ABI
+
+#endif // __has_include(<cxxabi.h>)
+#endif // defined(__GNUC__) || defined(__clang__)
+
 namespace cs2_lib::sexp {
 using namespace std::string_view_literals;
 
@@ -55,8 +67,38 @@ inline auto format_ice(cs2_lib::sexp::Span span, std::string_view message)
 #ifdef CS2LIB_DEBUG
 const inline cpptrace::formatter strace_fmt =
     cpptrace::formatter{}.header("Stack trace:").snippets(true);
-
 #endif
+
+[[nodiscard]] inline auto ex_typename_inner(const std::type_info &info)
+    -> std::string {
+#ifdef CS2LIB_ITANIUM_ABI
+    int status = 0;
+    std::unique_ptr<char, void (*)(void *)> owned{
+        abi::__cxa_demangle(info.name(), nullptr, nullptr, &status), std::free};
+    return (status == 0 && owned) ? std::string{owned.get()}
+                                  : std::string{info.name()};
+#else
+    return std::string{info.name()};
+#endif // CS2LIB_ITANIUM_ABI
+}
+
+[[nodiscard]] inline auto ex_typename(const std::exception &exc)
+    -> std::string {
+    return ex_typename_inner(typeid(exc));
+}
+
+[[nodiscard]] inline auto current_ex_typename() -> std::optional<std::string> {
+#ifdef CS2LIB_ITANIUM_ABI
+    const std::type_info *info = abi::__cxa_current_exception_type();
+    if (info == nullptr) {
+        return std::nullopt;
+    }
+    return ex_typename_inner(*info);
+#else
+    return std::nullopt;
+#endif // CS2LIB_ITANIUM_ABI
+}
+
 } // namespace _impl
 
 ///
@@ -258,10 +300,12 @@ using ICEBase = cpptrace::exception_with_message;
 
 class ICEBase : public std::exception {
   public:
-    explicit ICEBase(std::string &&message) noexcept : message{std::move(message)} {}
+    explicit ICEBase(std::string &&message) noexcept
+        : message{std::move(message)} {}
     [[nodiscard]] auto what() const noexcept -> const char * override {
         return this->message.c_str();
     }
+
   private:
     std::string message;
 };
@@ -275,27 +319,26 @@ class ICEBase : public std::exception {
 class InternalCompilerError : public _impl::ICEBase {
   public:
     InternalCompilerError(std::optional<Span> span, std::string &&message)
-        : _impl::ICEBase(
-              _impl::format_ice(span.value_or(Span::invalid()), std::move(message))) {}
+        : _impl::ICEBase(_impl::format_ice(span.value_or(Span::invalid()),
+                                           std::move(message))) {}
 
     InternalCompilerError(std::string &&message)
         : InternalCompilerError(std::nullopt, std::move(message)) {}
 
     template <class T, class... Args>
-    InternalCompilerError(std::format_string<T, Args...> fmt, T &&arg1, Args &&...args)
-        : InternalCompilerError{
-              std::nullopt, std::format(fmt, std::forward<T>(arg1), std::forward<Args>(args)...)} {
-    }
+    InternalCompilerError(std::format_string<T, Args...> fmt, T &&arg1,
+                          Args &&...args)
+        : InternalCompilerError{std::nullopt,
+                                std::format(fmt, std::forward<T>(arg1),
+                                            std::forward<Args>(args)...)} {}
 
     template <class T, class... Args>
     InternalCompilerError(Span span, std::format_string<T, Args...> fmt,
-                          T &&arg1,
-                          Args &&...args)
-        : InternalCompilerError{
-              std::make_optional(span),
-              std::format(fmt, std::forward<T>(arg1), std::forward<Args>(args)...)} {}
+                          T &&arg1, Args &&...args)
+        : InternalCompilerError{std::make_optional(span),
+                                std::format(fmt, std::forward<T>(arg1),
+                                            std::forward<Args>(args)...)} {}
 };
-
 
 namespace lexer {
 ///
@@ -489,7 +532,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
                         if (this->has_emitted_eof) {
                             throw InternalCompilerError{
                                 this->span,
-                                "Dereferenced past the end of the token stream",
+                                "dereferenced past the end of the token stream",
                             };
                         }
 
@@ -541,7 +584,36 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             return this->data.substr(this->span.index, this->span.length);
         }
 
-        [[nodiscard]] constexpr auto lex() -> std::optional<Token> {
+        [[nodiscard]] auto lex() -> std::optional<Token> {
+            try {
+                return this->lex_inner();
+            } catch (const InternalCompilerError &) {
+                throw;
+            } catch (const std::bad_alloc &) {
+                throw;
+            } catch (const std::exception &e) {
+                throw InternalCompilerError{
+                    this->span,
+                    std::format(
+                        "unhandled exception of type {} in the lexer: {}",
+                        _impl::ex_typename(e), e.what()),
+                };
+            } catch (...) {
+                std::optional<std::string> current_ex_ty =
+                    _impl::current_ex_typename();
+                if (current_ex_ty.has_value()) {
+                    throw InternalCompilerError{
+                        this->span,
+                        "unknown thrown non-exception in the lexer of type {}",
+                        current_ex_ty.value()};
+                }
+                throw InternalCompilerError{this->span,
+                                            "unknown thrown non-exception in "
+                                            "the lexer of unknown type"};
+            }
+        }
+
+        [[nodiscard]] constexpr auto lex_inner() -> std::optional<Token> {
             Token ret{this->span};
 
             while (this->data.length() > this->span.end_index() &&
@@ -580,7 +652,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
                 if (!complete) {
                     ret = Token{TokenType::Error, this->span,
-                                "Unterminated string slice"sv};
+                                "unterminated string slice"sv};
                 } else {
                     ret = Token{TokenType::Atom, this->span, this->get_slice()};
                 }
