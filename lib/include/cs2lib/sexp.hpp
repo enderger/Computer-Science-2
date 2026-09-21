@@ -27,6 +27,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <typeinfo>
 #include <unordered_set>
 #include <utility>
@@ -43,11 +44,9 @@
 #endif // CS2LIB_DEBUG
 
 namespace cs2_lib::sexp {
-struct Span;
-} // namespace cs2_lib::sexp
-
-namespace cs2_lib::sexp {
 using namespace std::string_view_literals;
+
+struct Span;
 
 namespace _impl {
 inline auto format_ice(cs2_lib::sexp::Span span, std::string_view message)
@@ -144,10 +143,17 @@ struct Span {
     constexpr auto chop() && -> Span {
         this->begin_line = this->end_line;
         this->begin_column = this->end_column;
-        this->index = this->index + this->length;
+        this->index = this->end_index();
         this->length = 0;
 
         return *this;
+    }
+
+    ///
+    /// Get the index of the end of this span
+    ///
+    [[nodiscard]] constexpr auto end_index() const -> uint64_t {
+        return this->index + this->length;
     }
 
     ///
@@ -243,40 +249,53 @@ class Error {
     friend class std::formatter<Error>;
 };
 
+namespace _impl {
 #ifdef CS2LIB_DEBUG
 
-///
-/// An internal compiler error, stacktrace included in a debug build
-///
-class InternalCompilerError : public cpptrace::exception_with_message {
-  public:
-    InternalCompilerError(std::string_view message,
-                          std::optional<Span> span = std::nullopt) noexcept
-        : cpptrace::exception_with_message(
-              _impl::format_ice(span.value_or(Span::invalid()), message)) {}
-};
+using ICEBase = cpptrace::exception_with_message;
 
 #else
 
-///
-/// An internal compiler error, compile in debug mode to get a
-/// compiler stacktrace.
-///
-class InternalCompilerError : public std::exception {
+class ICEBase : public std::exception {
   public:
-    InternalCompilerError(std::string_view message,
-                          std::optional<Span> span = std::nullopt)
-        : message{_impl::format_ice(span.value_or(Span::invalid()), message)} {}
-
-    constexpr auto what() const noexcept -> const char * {
-        return this->message.data();
+    explicit ICEBase(std::string &&message) noexcept : message{std::move(message)} {}
+    [[nodiscard]] auto what() const noexcept -> const char * override {
+        return this->message.c_str();
     }
-
   private:
     std::string message;
 };
 
 #endif // CS2LIB_DEBUG
+} // namespace _impl
+
+///
+/// An internal compiler error, stacktrace included in a debug build
+///
+class InternalCompilerError : public _impl::ICEBase {
+  public:
+    InternalCompilerError(std::optional<Span> span, std::string &&message)
+        : _impl::ICEBase(
+              _impl::format_ice(span.value_or(Span::invalid()), std::move(message))) {}
+
+    InternalCompilerError(std::string &&message)
+        : InternalCompilerError(std::nullopt, std::move(message)) {}
+
+    template <class T, class... Args>
+    InternalCompilerError(std::format_string<T, Args...> fmt, T &&arg1, Args &&...args)
+        : InternalCompilerError{
+              std::nullopt, std::format(fmt, std::forward<T>(arg1), std::forward<Args>(args)...)} {
+    }
+
+    template <class T, class... Args>
+    InternalCompilerError(Span span, std::format_string<T, Args...> fmt,
+                          T &&arg1,
+                          Args &&...args)
+        : InternalCompilerError{
+              std::make_optional(span),
+              std::format(fmt, std::forward<T>(arg1), std::forward<Args>(args)...)} {}
+};
+
 
 namespace lexer {
 ///
@@ -364,7 +383,7 @@ struct Token {
     constexpr Token(Token &&other) noexcept
         : type{other.type}, span{other.span}, data{std::move(other.data)} {}
 
-    constexpr Token(const Token &other) noexcept = default;
+    constexpr Token(const Token &other) = default;
 
     constexpr auto operator=(Token &&other) noexcept -> Token & {
         this->type = other.type;
@@ -377,24 +396,34 @@ struct Token {
     constexpr auto operator=(const Token &other) -> Token & = default;
 
     [[nodiscard]] constexpr auto get_data_owned() const -> std::string {
-        if (const std::string_view *data =
-                std::get_if<std::string_view>(&this->data)) {
-            return std::string(*data);
-        }
-        if (const std::string *data = std::get_if<std::string>(&this->data)) {
-            return {*data};
-        }
-        std::unreachable();
+        return std::visit(
+            [](auto &&arg) -> std::string {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string_view>) {
+                    return std::string(arg);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    return arg;
+                } else {
+                    static_assert(false,
+                                  "non-exhaustive token underlying type match");
+                }
+            },
+            this->data);
     }
     [[nodiscard]] constexpr auto get_data_borrowed() const -> std::string_view {
-        if (const std::string_view *data =
-                std::get_if<std::string_view>(&this->data)) {
-            return *data;
-        }
-        if (const std::string *data = std::get_if<std::string>(&this->data)) {
-            return *data;
-        }
-        std::unreachable();
+        return std::visit(
+            [](auto &&arg) -> std::string_view {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string_view>) {
+                    return arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    return std::string_view{arg};
+                } else {
+                    static_assert(false,
+                                  "non-exhaustive token underlying type match");
+                }
+            },
+            this->data);
     }
 };
 
@@ -411,7 +440,7 @@ struct LexerError : public Error {
 
   protected:
     [[nodiscard]] auto equals(const Error &other) const -> bool override {
-        const auto otherLE = static_cast<const LexerError &>(other);
+        const auto &otherLE = static_cast<const LexerError &>(other);
         return otherLE.get_span() == this->get_span() &&
                otherLE.get_message() == this->get_message();
     }
@@ -448,24 +477,26 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
                                 std::unexpect, tok};
                         }
                         if (tok.type == TokenType::InternalCompilerError) {
-                            throw InternalCompilerError{tok.get_data_owned(),
-                                                        tok.span};
+                            throw InternalCompilerError{tok.span,
+                                                        tok.get_data_owned()};
                         }
 
                         return std::expected<Token, LexerError>{tok};
                     })
-                .or_else([this]() -> std::optional<
-                                      std::expected<Token, LexerError>> {
-                    if (this->has_emitted_eof) {
-                        throw InternalCompilerError{
-                            "ICE: dereferenced past the end of the token stream"sv,
-                            this->span,
-                        };
-                    }
+                .or_else(
+                    [this]()
+                        -> std::optional<std::expected<Token, LexerError>> {
+                        if (this->has_emitted_eof) {
+                            throw InternalCompilerError{
+                                this->span,
+                                "Dereferenced past the end of the token stream",
+                            };
+                        }
 
-                    return std::make_optional(std::expected<Token, LexerError>{
-                        Token{TokenType::Eof, this->span, ""sv}});
-                })
+                        return std::make_optional(
+                            std::expected<Token, LexerError>{
+                                Token{TokenType::Eof, this->span, ""sv}});
+                    })
                 .value();
         }
 
@@ -513,11 +544,10 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         [[nodiscard]] constexpr auto lex() -> std::optional<Token> {
             Token ret{this->span};
 
-            while (
-                this->data.length() > this->span.index + this->span.length &&
-                std::isspace(this->data[this->span.index + this->span.length],
-                             this->settings.locale)) {
-                this->span += this->data[this->span.index];
+            while (this->data.length() > this->span.end_index() &&
+                   std::isspace(this->data[this->span.end_index()],
+                                this->settings.locale)) {
+                this->span += this->data[this->span.end_index()];
             }
             this->span = std::move(this->span).chop();
 
@@ -564,6 +594,22 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
                 ret = Token{TokenType::LParen, this->span, this->get_slice()};
             } else if (cur == ')') {
                 ret = Token{TokenType::RParen, this->span, this->get_slice()};
+            } else {
+                // NOTE: This is safe because substr(length) is defined as the
+                //       empty string.
+                const auto tail = this->data.substr(this->span.index + 1);
+                const auto rest = std::ranges::distance(
+                    tail | std::views::take_while([this](char data) -> bool {
+                        return !this->is_atom_terminator(data);
+                    }));
+
+                this->span += Span::Diff{
+                    .lines = 0,
+                    .columns = static_cast<uint64_t>(rest),
+                    .characters = static_cast<uint64_t>(rest),
+                };
+
+                ret = Token{TokenType::Atom, this->span, this->get_slice()};
             }
 
             this->span = std::move(this->span).chop();
@@ -578,8 +624,8 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
     constexpr TokenStream(R &&inner, Settings settings,
                           std::string_view file_name)
         : settings{std::move(settings)},
-          inner{std::ranges::views::all(std::forward<R>(inner))},
-          file_name{file_name} {}
+          inner{std::views::all(std::forward<R>(inner))}, file_name{file_name} {
+    }
 
     // ITERATORS
     [[nodiscard]] auto begin() const -> Iterator { return Iterator{this}; }
