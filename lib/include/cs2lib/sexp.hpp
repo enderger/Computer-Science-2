@@ -20,12 +20,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
-#include <expected>
 #include <format>
 #include <iterator>
 #include <locale>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -108,12 +108,18 @@ struct Settings {
     ///
     /// The locale data for the application
     ///
-    std::locale locale{std::locale::classic()};
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::locale locale;
 
     ///
     /// The quote character(s), used in cases where quotes are inconvenient
     ///
-    std::unordered_set<char> quote_characters{'"'};
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::unordered_set<char> quote_characters;
+
+    Settings(const std::locale &locale = std::locale::classic(),
+             std::unordered_set<char> quote_characters = {'"'})
+        : locale{locale}, quote_characters{std::move(quote_characters)} {}
 };
 
 ///
@@ -321,6 +327,13 @@ class InternalCompilerError : public _impl::ICEBase {
     InternalCompilerError(std::optional<Span> span, std::string &&message)
         : _impl::ICEBase(_impl::format_ice(span.value_or(Span::invalid()),
                                            std::move(message))) {}
+#ifdef CS2LIB_DEBUG
+    InternalCompilerError(std::optional<Span> span,
+                          cpptrace::raw_trace &&strace, std::string &&message)
+        : _impl::ICEBase(_impl::format_ice(span.value_or(Span::invalid()),
+                                           std::move(message)),
+                         std::move(strace)) {}
+#endif
 
     InternalCompilerError(std::string &&message)
         : InternalCompilerError(std::nullopt, std::move(message)) {}
@@ -374,12 +387,38 @@ enum class TokenType : uint8_t {
     /// An error in the token stream
     ///
     Error,
+};
 
+///
+/// Special data implementation for the error tokens
+///
+struct ErrorData {
     ///
-    /// An internal compiler error, this is used for errors that MUST be encoded
-    /// in the token stream before sending
+    /// The error message
     ///
-    InternalCompilerError
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::string message;
+
+#ifdef CS2LIB_DEBUG
+    ///
+    /// The span of the error
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    cpptrace::raw_trace trace;
+#endif
+
+    ErrorData(std::string message)
+        : message{std::move(message)}
+#ifdef CS2LIB_DEBUG
+          ,
+          trace{cpptrace::generate_raw_trace()}
+#endif
+    {
+    }
+
+    constexpr auto operator==(const ErrorData &other) const -> bool {
+        return this->message == other.message;
+    }
 };
 
 ///
@@ -391,6 +430,7 @@ struct Token {
     ///
     // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
     TokenType type;
+
     ///
     /// The data at the token's location
     ///
@@ -399,29 +439,16 @@ struct Token {
 
     ///
     /// A view into the data of a token
-    /// This is the (owned) error message for error tokens (including ICE)
+    /// This is either a view into the raw text of the token or error data
     ///
     // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    std::variant<std::string_view, std::string> data;
+    std::variant<std::string_view, ErrorData> data;
 
-    ///
-    /// Construct an owning token from a moved string
-    ///
-    constexpr Token(TokenType type, Span span, std::string &&data)
-        : type{type}, span{span}, data{std::move(data)} {}
-
-    ///
-    /// Construct a non-owning token
-    ///
     constexpr Token(TokenType type, Span span, std::string_view data)
         : type{type}, span{span}, data{data} {}
 
-    ///
-    /// Create an uninitialized token at a given span, these are a form of ICE
-    ///
-    constexpr Token(Span span)
-        : type{TokenType::InternalCompilerError}, span{span},
-          data{"Uninitialized token"sv} {}
+    constexpr Token(TokenType type, Span span, ErrorData &&error_data)
+        : type{type}, span{span}, data{std::move(error_data)} {}
 
     constexpr Token(Token &&other) noexcept
         : type{other.type}, span{other.span}, data{std::move(other.data)} {}
@@ -438,55 +465,10 @@ struct Token {
 
     constexpr auto operator=(const Token &other) -> Token & = default;
 
-    [[nodiscard]] constexpr auto get_data_owned() const -> std::string {
-        return std::visit(
-            [](auto &&arg) -> std::string {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, std::string_view>) {
-                    return std::string(arg);
-                } else if constexpr (std::is_same_v<T, std::string>) {
-                    return arg;
-                } else {
-                    static_assert(false,
-                                  "non-exhaustive token underlying type match");
-                }
-            },
-            this->data);
-    }
-    [[nodiscard]] constexpr auto get_data_borrowed() const -> std::string_view {
-        return std::visit(
-            [](auto &&arg) -> std::string_view {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, std::string_view>) {
-                    return arg;
-                } else if constexpr (std::is_same_v<T, std::string>) {
-                    return std::string_view{arg};
-                } else {
-                    static_assert(false,
-                                  "non-exhaustive token underlying type match");
-                }
-            },
-            this->data);
-    }
-};
+    constexpr auto operator==(const Token &other) const -> bool = default;
 
-///
-/// The shared error type for the lexer
-///
-struct LexerError : public Error {
-    LexerError(const Token &tok) : Error(tok.span, tok.get_data_owned()) {}
-
-    [[nodiscard]] constexpr auto subsystem() const
-        -> std::string_view override {
-        return "lexer"sv;
-    }
-
-  protected:
-    [[nodiscard]] auto equals(const Error &other) const -> bool override {
-        const auto &otherLE = static_cast<const LexerError &>(other);
-        return otherLE.get_span() == this->get_span() &&
-               otherLE.get_message() == this->get_message();
-    }
+  private:
+    friend class std::formatter<Token>;
 };
 
 ///
@@ -502,7 +484,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
       public:
         using iterator_concept = std::input_iterator_tag;
         using difference_type = std::ptrdiff_t;
-        using value_type = std::expected<Token, LexerError>;
+        using value_type = Token;
 
         constexpr Iterator() = default;
         constexpr explicit Iterator(const TokenStream<R> *view)
@@ -511,35 +493,19 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             this->current = this->lex();
         }
 
-        constexpr auto operator*() const -> std::expected<Token, LexerError> {
+        constexpr auto operator*() const -> Token {
             return this->current
-                .transform(
-                    [](const Token &tok) -> std::expected<Token, LexerError> {
-                        if (tok.type == TokenType::Error) {
-                            return std::expected<Token, LexerError>{
-                                std::unexpect, tok};
-                        }
-                        if (tok.type == TokenType::InternalCompilerError) {
-                            throw InternalCompilerError{tok.span,
-                                                        tok.get_data_owned()};
-                        }
+                .or_else([this]() -> std::optional<Token> {
+                    if (this->has_emitted_eof) {
+                        throw InternalCompilerError{
+                            this->span,
+                            "dereferenced past the end of the token stream",
+                        };
+                    }
 
-                        return std::expected<Token, LexerError>{tok};
-                    })
-                .or_else(
-                    [this]()
-                        -> std::optional<std::expected<Token, LexerError>> {
-                        if (this->has_emitted_eof) {
-                            throw InternalCompilerError{
-                                this->span,
-                                "dereferenced past the end of the token stream",
-                            };
-                        }
-
-                        return std::make_optional(
-                            std::expected<Token, LexerError>{
-                                Token{TokenType::Eof, this->span, ""sv}});
-                    })
+                    return std::make_optional(
+                        Token{TokenType::Eof, this->span, ""sv});
+                })
                 .value();
         }
 
@@ -575,7 +541,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         bool has_emitted_eof{false};
 
         constexpr auto is_atom_terminator(char data) -> bool {
-            return data == '(' || data == ')' ||
+            return data == '(' || data == ')' || data == ';' ||
                    this->settings.quote_characters.contains(data) ||
                    std::isspace(data, this->settings.locale);
         }
@@ -613,16 +579,78 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             }
         }
 
-        [[nodiscard]] constexpr auto lex_inner() -> std::optional<Token> {
-            Token ret{this->span};
+        constexpr void drop_whitespace() {
+            while (this->data.length() > this->span.index &&
+                   (this->data[this->span.index] == ';' ||
+                    std::isspace(this->data[this->span.index],
+                                 this->settings.locale))) {
+                const bool is_comment =
+                    this->data.length() > this->span.index &&
+                    this->data[this->span.index] == ';';
+                while (is_comment &&
+                       this->span.end_index() < this->data.length() &&
+                       this->data[this->span.end_index()] != '\n') {
+                    this->span += this->data[this->span.end_index()];
+                }
 
-            while (this->data.length() > this->span.end_index() &&
-                   std::isspace(this->data[this->span.end_index()],
-                                this->settings.locale)) {
-                this->span += this->data[this->span.end_index()];
+                while (this->span.end_index() < this->data.length() &&
+                       std::isspace(this->data[this->span.end_index()],
+                                    this->settings.locale)) {
+                    this->span += this->data[this->span.end_index()];
+                }
+
+                this->span = std::move(this->span).chop();
             }
-            this->span = std::move(this->span).chop();
+        }
 
+        [[nodiscard]] constexpr auto lex_quoted() -> Token {
+            const char quote = this->data[this->span.index];
+            // NOTE: This has to be imperative, as an arbitrary sized window
+            //       cannot capture a n+1 sized escape sequence chain. So,
+            //       we do this the boring way.
+            bool escape = false;
+            bool complete = false;
+            for (char chara : this->data.substr(this->span.index + 1)) {
+                this->span += chara;
+                if (escape) {
+                    escape = false;
+                } else if (chara == '\\') {
+                    escape = true;
+                } else if (chara == quote) {
+                    complete = true;
+                    break;
+                }
+            }
+
+            if (!complete) {
+                return Token{TokenType::Error, this->span,
+                             ErrorData{"unterminated string slice"}};
+            }
+            return Token{TokenType::Atom, this->span, this->get_slice()};
+        }
+
+        [[nodiscard]] constexpr auto lex_atom() -> Token {
+            // NOTE: This is safe because substr(length) is defined as the
+            //       empty string.
+            const auto tail = this->data.substr(this->span.index + 1);
+            const auto rest = std::ranges::distance(
+                tail | std::views::take_while([this](char data) -> bool {
+                    return !this->is_atom_terminator(data);
+                }));
+
+            this->span += Span::Diff{
+                .lines = 0,
+                .columns = static_cast<uint64_t>(rest),
+                .characters = static_cast<uint64_t>(rest),
+            };
+
+            return Token{TokenType::Atom, this->span, this->get_slice()};
+        }
+
+        [[nodiscard]] constexpr auto lex_inner() -> std::optional<Token> {
+            std::optional<Token> ret;
+
+            this->drop_whitespace();
             if (this->span.index >= this->data.length()) {
                 return std::nullopt;
             }
@@ -633,29 +661,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
             const char cur = this->data[this->span.index];
             if (this->settings.quote_characters.contains(cur)) {
-                // NOTE: This has to be imperative, as an arbitrary sized window
-                //       cannot capture a n+1 sized escape sequence chain. So,
-                //       we do this the boring way.
-                bool escape = false;
-                bool complete = false;
-                for (char chara : this->data.substr(this->span.index + 1)) {
-                    this->span += chara;
-                    if (escape) {
-                        escape = false;
-                    } else if (chara == '\\') {
-                        escape = true;
-                    } else if (chara == cur) {
-                        complete = true;
-                        break;
-                    }
-                }
-
-                if (!complete) {
-                    ret = Token{TokenType::Error, this->span,
-                                "unterminated string slice"sv};
-                } else {
-                    ret = Token{TokenType::Atom, this->span, this->get_slice()};
-                }
+                ret = this->lex_quoted();
             } else if (cur == '.' &&
                        (this->data.length() <= this->span.index + 1 ||
                         std::isspace(this->data[this->span.index + 1],
@@ -667,25 +673,11 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             } else if (cur == ')') {
                 ret = Token{TokenType::RParen, this->span, this->get_slice()};
             } else {
-                // NOTE: This is safe because substr(length) is defined as the
-                //       empty string.
-                const auto tail = this->data.substr(this->span.index + 1);
-                const auto rest = std::ranges::distance(
-                    tail | std::views::take_while([this](char data) -> bool {
-                        return !this->is_atom_terminator(data);
-                    }));
-
-                this->span += Span::Diff{
-                    .lines = 0,
-                    .columns = static_cast<uint64_t>(rest),
-                    .characters = static_cast<uint64_t>(rest),
-                };
-
-                ret = Token{TokenType::Atom, this->span, this->get_slice()};
+                ret = this->lex_atom();
             }
 
             this->span = std::move(this->span).chop();
-            return {std::move(ret)};
+            return {ret};
         }
     };
     static_assert(std::input_iterator<Iterator>);
@@ -793,6 +785,92 @@ class std::formatter<cs2_lib::sexp::Error>
 #endif // CS2LIB_DEBUG
     }
 };
+
+template <>
+class std::formatter<cs2_lib::sexp::lexer::TokenType>
+    : public std::formatter<std::string> {
+  public:
+    template <class FormatCtx>
+    constexpr auto format(const cs2_lib::sexp::lexer::TokenType &typ,
+                          FormatCtx &ctx) const {
+        std::string_view type_name;
+        switch (typ) {
+        case cs2_lib::sexp::lexer::TokenType::LParen:
+            type_name = "left-parentheses"sv;
+            break;
+        case cs2_lib::sexp::lexer::TokenType::RParen:
+            type_name = "right-parentheses"sv;
+            break;
+        case cs2_lib::sexp::lexer::TokenType::ListTerminator:
+            type_name = "list-terminator"sv;
+            break;
+        case cs2_lib::sexp::lexer::TokenType::Atom:
+            type_name = "atom"sv;
+            break;
+        case cs2_lib::sexp::lexer::TokenType::Error:
+            type_name = "error";
+            break;
+        case cs2_lib::sexp::lexer::TokenType::Eof:
+            type_name = "EOF";
+            break;
+        default:
+            throw cs2_lib::sexp::InternalCompilerError(
+                "No string representation for token type ID {}, add it to "
+                "std::formatter<TokenType>",
+                (uint16_t)typ);
+        }
+
+        return std::formatter<std::string>::format(
+            std::format(":{}", type_name), ctx);
+    }
+};
+
+template <>
+class std::formatter<cs2_lib::sexp::lexer::ErrorData>
+    : public std::formatter<std::string> {
+  public:
+    template <class FormatCtx>
+    constexpr auto format(const cs2_lib::sexp::lexer::ErrorData &err,
+                          FormatCtx &ctx) const {
+        return std::formatter<std::string>::format(
+            std::format("(Error {})", err.message), ctx);
+    }
+};
+
+template <>
+class std::formatter<cs2_lib::sexp::lexer::Token>
+    : public std::formatter<std::string> {
+  public:
+    template <class FormatCtx>
+    constexpr auto format(const cs2_lib::sexp::lexer::Token &tok,
+                          FormatCtx &ctx) const {
+        std::string formatted_data = std::visit(
+            [](const auto &data) -> std::string {
+                using T = std::decay_t<decltype(data)>;
+                if constexpr (std::is_same_v<T, std::string_view>) {
+                    return std::string(data);
+                } else if constexpr (std::is_same_v<
+                                         T, cs2_lib::sexp::lexer::ErrorData>) {
+                    return std::format("{}", data);
+                } else {
+                    static_assert(false,
+                                  "New type added to the Token data variant "
+                                  "needs to be added to the formatter.");
+                }
+            },
+            tok.data);
+        return std::formatter<std::string>::format(
+            std::format("(Token \"{}\" {} '{})", tok.span, tok.type,
+                        formatted_data),
+            ctx);
+    }
+};
+
+constexpr auto operator<<(std::ostream &ost,
+                          const cs2_lib::sexp::lexer::Token &tok)
+    -> std::ostream & {
+    return ost << std::format("{}", tok);
+}
 
 namespace cs2_lib::sexp::_impl {
 auto format_ice(cs2_lib::sexp::Span span, std::string_view message)
