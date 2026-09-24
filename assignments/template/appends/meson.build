@@ -7,6 +7,7 @@ test(
         dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
     ),
+    suite: 'basic',
 )
 
 executable(

@@ -11,39 +11,45 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-BUILDDIR := env("BUILDDIR", 'build')
-
+# 
 [arg('mode', help="The optimization mode to use")]
 configure mode='debug':
-    # THIS IS INTENTIONALLY UNQUOTED, THE ARGS ARE MEANT TO BE INTERPRETED AS A LIST.
     case '{{ mode }}' in \
         "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
+        "optimized-debug") export FLAGS="-Db_sanitize=address,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "release") export FLAGS="--buildtype=release";; \
-        *) echo >&2 "Error: Please select a build type of 'debug', 'thread-debug', or 'release'"; exit 1;; \
+        "release-sanitized") export FLAGS="--buildtype=release --optimization=3 -Db_sanitize=undefined";; \
+        *) echo >&2 "Error: Please select a build type of 'debug', 'optimized-debug', 'thread-debug', 'release', or 'release-sanitized'"; exit 1;; \
     esac && \
-    meson setup '{{ BUILDDIR }}-{{ mode }}' ${FLAGS} --reconfigure
+    meson setup 'build-{{ mode }}' ${FLAGS}
 
 [arg('mode', help="The optimization mode to use")]
 build mode='debug': (configure mode)
-    ninja -C '{{ BUILDDIR }}-{{ mode }}'
+    ninja -C 'build-{{ mode }}'
 
 [arg('mode', help="The optimization mode to use")]
-test mode='debug': (build mode)
-    meson test -C "{{ BUILDDIR }}-{{ mode }}" --suite basic
+[arg('suite', help="The test suite to run")]
+test suite='basic' mode='optimized-debug': (build mode)
+    meson test -C "build-{{ mode }}" --suite "{{ suite }}"
 
-[arg('executable', help="The executable to run")]
 [arg('mode', help="The optimization mode to use")]
-run executable mode='debug': (build mode)
-    export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
-        "{{ BUILDDIR }}-{{ mode }}/${EXE}"
+test-harness mode='thread-debug': (build mode)
+    meson test -C "build-{{ mode }}" --suite "minimal"
 
-[arg('executable', help="The executable to debug")]
+check: test test-harness
+
+fuzz mode='optimized-debug': (build mode)
+    meson test -C "build-{{ mode }}" --suite "fuzz"
+
+fuzz-deep mode='release-sanitized': (build mode)
+    meson test -C "build-{{ mode }}" --suite "deep"
+
 [arg('mode', help="The optimization mode to use")]
-debug executable mode='debug': (build mode)
+debug mode='debug': (build mode)
     #!/usr/bin/env sh
     set -eu
+
     if [ "{{ mode }}" = "release" ]; then
       echo >&2 "Cannot debug a release build";
       exit 1;
@@ -68,12 +74,11 @@ debug executable mode='debug': (build mode)
       fi
     fi
 
-    export EXE="$(echo "{{ executable }}" | sed -E 's|([^-]*).*|\1/&|')" && \
-    lldb "{{ BUILDDIR }}-{{ mode }}/${EXE}"
+    lldb 'build-{{ mode }}/cs2-lib-test'
 
 [arg('mode', help="The optimization mode to use")]
 install mode='release': (build mode)
-    meson install -C "{{ BUILDDIR }}-{{ mode }}"
+    meson install -C 'build-{{ mode }}'
 
 clean:
-    rm -rf '{{ BUILDDIR }}'*
+    rm -rf build*

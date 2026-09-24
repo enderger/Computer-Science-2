@@ -55,14 +55,31 @@ test(
         src,
         'test.cpp',
         cpp_args: [
-            '-DCS2LIB_FULL_FUZZ_DEPTH=1',
-            '-DCS2LIB_CURATED_FUZZ_DEPTH=2',
+            '-DCS2LIB_FULL_FUZZ_DEPTH=2',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=3',
+            '-DCS2LIB_FUZZ_THREADS=1',
         ],
         include_directories: inc_dir,
         dependencies: [cpptrace_dep, doctest_dep],
     ),
     suite: 'basic',
     timeout: 60,
+)
+test(
+    'cs2-lib-minimal',
+    executable(
+        'cs2-lib-test-minimal',
+        src,
+        'test.cpp',
+        cpp_args: [
+            '-DCS2LIB_FULL_FUZZ_DEPTH=2',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=2',
+        ],
+        include_directories: inc_dir,
+        dependencies: [cpptrace_dep, doctest_dep],
+    ),
+    suite: 'minimal',
+    timeout: 30,
 )
 test(
     'cs2-lib-test-fuzz',
@@ -72,7 +89,7 @@ test(
         'test.cpp',
         cpp_args: [
             '-DCS2LIB_FULL_FUZZ_DEPTH=3',
-            '-DCS2LIB_CURATED_FUZZ_DEPTH=3',
+            '-DCS2LIB_CURATED_FUZZ_DEPTH=4',
         ],
         include_directories: inc_dir,
         dependencies: [cpptrace_dep, doctest_dep],

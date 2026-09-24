@@ -19,10 +19,10 @@ cs2_lib_dep = dependency('cs2-lib', fallback: ['cs2-lib', 'cs2_lib_dep'])
 incdir = include_directories('include')
 
 test(
-    'week3-problem1',
+    'week6-probleme1',
     executable(
-        'week3-problem1-tests',
-        'week3-problem1.cpp',
+        'week6-probleme1-tests',
+        'week6-probleme1.cpp',
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
         dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
@@ -31,9 +31,9 @@ test(
 )
 
 executable(
-    'week3-problem1',
-    'week3-problem1.cpp',
-    'week3-problem1-runner.cpp',
+    'week6-probleme1',
+    'week6-probleme1.cpp',
+    'week6-probleme1-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: [doctest_dep, cs2_lib_dep],
     include_directories: incdir,
@@ -41,10 +41,10 @@ executable(
 )
 
 test(
-    'week3-problem2',
+    'week6-problemE2',
     executable(
-        'week3-problem2-tests',
-        'week3-problem2.cpp',
+        'week6-problemE2-tests',
+        'week6-problemE2.cpp',
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
         dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
@@ -53,9 +53,9 @@ test(
 )
 
 executable(
-    'week3-problem2',
-    'week3-problem2.cpp',
-    'week3-problem2-runner.cpp',
+    'week6-problemE2',
+    'week6-problemE2.cpp',
+    'week6-problemE2-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: [doctest_dep, cs2_lib_dep],
     include_directories: incdir,
@@ -63,10 +63,10 @@ executable(
 )
 
 test(
-    'week3-problem3',
+    'week6-problemE3',
     executable(
-        'week3-problem3-tests',
-        'week3-problem3.cpp',
+        'week6-problemE3-tests',
+        'week6-problemE3.cpp',
         cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
         dependencies: [doctest_dep, cs2_lib_dep],
         include_directories: incdir,
@@ -75,9 +75,9 @@ test(
 )
 
 executable(
-    'week3-problem3',
-    'week3-problem3.cpp',
-    'week3-problem3-runner.cpp',
+    'week6-problemE3',
+    'week6-problemE3.cpp',
+    'week6-problemE3-runner.cpp',
     cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
     dependencies: [doctest_dep, cs2_lib_dep],
     include_directories: incdir,
