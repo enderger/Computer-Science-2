@@ -29,7 +29,6 @@
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <type_traits>
 #include <typeinfo>
 #include <unordered_set>
 #include <utility>
@@ -58,11 +57,11 @@
 namespace cs2_lib::sexp {
 using namespace std::string_view_literals;
 
-struct Span;
+class Span;
 
 namespace _impl {
-inline auto format_ice(cs2_lib::sexp::Span span, std::string_view message)
-    -> std::string;
+inline auto format_ice(std::optional<cs2_lib::sexp::Span> span,
+                       std::string_view message) -> std::string;
 
 #ifdef CS2LIB_DEBUG
 const inline cpptrace::formatter strace_fmt =
@@ -109,35 +108,20 @@ struct Settings {
     /// The locale data for the application
     ///
     // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    std::locale locale;
+    std::locale locale{std::locale::classic()};
 
     ///
     /// The quote character(s), used in cases where quotes are inconvenient
     ///
     // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    std::unordered_set<char> quote_characters;
-
-    Settings(const std::locale &locale = std::locale::classic(),
-             std::unordered_set<char> quote_characters = {'"'})
-        : locale{locale}, quote_characters{std::move(quote_characters)} {}
+    std::unordered_set<char> quote_characters{'"'};
 };
 
 ///
 /// A span in the source code
 ///
-struct Span {
-    ///
-    /// The name of the source code file
-    ///
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    std::string_view file_name;
-
-    ///
-    /// The position of the span in the file
-    ///
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    uint64_t begin_line, begin_column, end_line, end_column, index, length;
-
+class Span {
+  public:
     ///
     /// The difference between two spans
     ///
@@ -152,7 +136,134 @@ struct Span {
         uint64_t lines, columns, characters;
     };
 
-    constexpr auto operator==(const Span &other) const -> bool = default;
+    ///
+    /// A single-character source code position
+    ///
+    struct Position {
+        // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+        uint64_t line{1}, col{0};
+
+        constexpr auto operator==(const Position &other) const
+            -> bool = default;
+    };
+
+    ///
+    /// A span between positions
+    ///
+    struct PositionSpan {
+        ///
+        /// The begin position of the span in the file
+        ///
+        // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+        Position begin_pos;
+
+        ///
+        /// The end position of the span in the file
+        ///
+        // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+        Position end_pos;
+
+        ///
+        /// The index of the beginning of the token
+        ///
+        // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+        uint64_t index;
+
+        ///
+        /// The index of the end of the token
+        ///
+        // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+        uint64_t length;
+
+        ///
+        /// Get the end index of this position
+        ///
+        [[nodiscard]] constexpr auto end_index() const -> uint64_t {
+            return this->index + this->length;
+        }
+
+        [[nodiscard]] constexpr auto operator==(const PositionSpan &other) const
+            -> bool = default;
+
+        ///
+        /// Move to the end of this position
+        ///
+        [[nodiscard]] constexpr auto chop() && -> PositionSpan {
+            this->begin_pos = this->end_pos;
+            this->index = this->index + this->length;
+            this->length = 0;
+            return *this;
+        }
+    };
+
+    ///
+    /// A factory for creating spans. This exists to separate out the file data
+    /// from the position data, even if in practice it requires two invocations
+    /// and doesn't get used in favor of `chop`
+    ///
+    class Factory {
+      public:
+        ///
+        /// Construct a factory for producing spans
+        ///
+        [[nodiscard]] constexpr Factory(
+            // This turns off a warning about easily confused names. It isn't
+            // founded NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+            std::string_view name, std::string_view data)
+            : file_name{name}, file_data{data} {}
+
+        ///
+        /// Construct a new span
+        ///
+        [[nodiscard]] constexpr auto make(PositionSpan pos) const -> Span {
+            return Span{this->file_name, this->file_data, pos};
+        }
+
+        ///
+        /// Construct a new span
+        ///
+        [[nodiscard]] constexpr auto make(Position begin_pos, Position end_pos,
+                                          uint64_t index, uint64_t length) const
+            -> Span {
+            return this->make({
+                .begin_pos = begin_pos,
+                .end_pos = end_pos,
+                .index = index,
+                .length = length,
+            });
+        }
+
+        ///
+        /// Construct a new invalid span
+        ///
+        [[nodiscard]] constexpr auto make_invalid() const -> Span {
+            return this->make(Position{.line = 1, .col = 0},
+                              Position{.line = 1, .col = 0}, 0, 0);
+        }
+
+        ///
+        /// Get the file name associated with this factory
+        ///
+        [[nodiscard]] constexpr auto get_file_name() const -> std::string_view {
+            return this->file_name;
+        }
+
+      private:
+        ///
+        /// The name of the source code file
+        ///
+        std::string_view file_name;
+
+        ///
+        /// A view into the whole file
+        ///
+        std::string_view file_data;
+    };
+
+    constexpr auto operator==(const Span &other) const -> bool {
+        return this->position_span == other.position_span &&
+               this->file_name == other.file_name;
+    }
 
     ///
     /// Add a character to this span
@@ -161,13 +272,13 @@ struct Span {
     ///
     constexpr void operator+=(unsigned char data) {
         if (data == '\n') {
-            this->end_line++;
-            this->end_column = 0;
+            this->position_span.end_pos.line += 1;
+            this->position_span.end_pos.col = 0;
         } else {
-            this->end_column++;
+            this->position_span.end_pos.col++;
         }
 
-        this->length++;
+        this->position_span.length++;
     }
 
     ///
@@ -176,10 +287,11 @@ struct Span {
     /// \param diff The fixed difference
     ///
     constexpr void operator+=(Diff diff) {
-        this->end_line += diff.lines;
-        this->end_column =
-            diff.columns + (diff.lines == 0 ? this->end_column : 0);
-        this->length += diff.characters;
+        this->position_span.end_pos.line += diff.lines;
+        this->position_span.end_pos.col =
+            diff.columns +
+            (diff.lines == 0 ? this->position_span.end_pos.col : 0);
+        this->position_span.length += diff.characters;
     }
 
     ///
@@ -188,36 +300,51 @@ struct Span {
     ///
     /// \return The moved span, to be reassigned.
     ///
-    constexpr auto chop() && -> Span {
-        this->begin_line = this->end_line;
-        this->begin_column = this->end_column;
-        this->index = this->end_index();
-        this->length = 0;
-
+    [[nodiscard]] constexpr auto chop() && -> Span {
+        this->position_span = std::move(this->position_span).chop();
         return *this;
     }
 
     ///
-    /// Get the index of the end of this span
+    /// Get the position data of this span (constant)
     ///
-    [[nodiscard]] constexpr auto end_index() const -> uint64_t {
-        return this->index + this->length;
+    [[nodiscard]] constexpr auto get_pos_span() const -> const PositionSpan & {
+        return this->position_span;
     }
 
     ///
-    /// Get the invalid span
+    /// Get the current file name
     ///
-    constexpr static auto invalid() -> Span {
-        return Span{
-            .file_name = "<UNKNOWN>",
-            .begin_line = 1,
-            .begin_column = 0,
-            .end_line = 1,
-            .end_column = 0,
-            .index = 0,
-            .length = 0,
-        };
+    [[nodiscard]] constexpr auto get_file_name() const
+        -> const std::string_view & {
+        return this->file_name;
     }
+
+  private:
+    ///
+    /// The name of the source code file
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::string_view file_name;
+
+    ///
+    /// A view into the whole file
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::string_view file_data;
+
+    ///
+    /// The position of the span in the file
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    PositionSpan position_span;
+
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    Span(std::string_view file_name, std::string_view file_data,
+         PositionSpan pos)
+        : file_name{file_name}, file_data{file_data}, position_span{pos} {}
+
+    friend class std::formatter<Span>;
 };
 
 ///
@@ -231,7 +358,7 @@ class Error {
     Error(Span span, std::string message
 #ifdef CS2LIB_DEBUG
           ,
-          cpptrace::stacktrace trace = cpptrace::generate_trace()
+          cpptrace::raw_trace trace = cpptrace::generate_raw_trace()
 #endif // CS2LIB_DEBUG
               )
         : span{span}, error_message{std::move(message)}
@@ -291,7 +418,7 @@ class Error {
     ///
     /// The compiler stacktrace (or empty on release builds)
     ///
-    cpptrace::stacktrace strace;
+    cpptrace::raw_trace strace;
 #endif // CS2LIB_DEBUG
 
     friend class std::formatter<Error>;
@@ -325,13 +452,11 @@ class ICEBase : public std::exception {
 class InternalCompilerError : public _impl::ICEBase {
   public:
     InternalCompilerError(std::optional<Span> span, std::string &&message)
-        : _impl::ICEBase(_impl::format_ice(span.value_or(Span::invalid()),
-                                           std::move(message))) {}
+        : _impl::ICEBase(_impl::format_ice(span, std::move(message))) {}
 #ifdef CS2LIB_DEBUG
     InternalCompilerError(std::optional<Span> span,
                           cpptrace::raw_trace &&strace, std::string &&message)
-        : _impl::ICEBase(_impl::format_ice(span.value_or(Span::invalid()),
-                                           std::move(message)),
+        : _impl::ICEBase(_impl::format_ice(span, std::move(message)),
                          std::move(strace)) {}
 #endif
 
@@ -450,6 +575,10 @@ struct Token {
     constexpr Token(TokenType type, Span span, ErrorData &&error_data)
         : type{type}, span{span}, data{std::move(error_data)} {}
 
+    constexpr Token(TokenType type, Span span,
+                    std::variant<std::string_view, ErrorData> &&data)
+        : type{type}, span{span}, data{std::move(data)} {}
+
     constexpr Token(Token &&other) noexcept
         : type{other.type}, span{other.span}, data{std::move(other.data)} {}
 
@@ -488,8 +617,8 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
         constexpr Iterator() = default;
         constexpr explicit Iterator(const TokenStream<R> *view)
-            : data{view->inner}, settings{view->settings} {
-            this->span.file_name = view->file_name;
+            : data{view->inner}, settings{view->settings},
+              span{Span::Factory{view->file_name, view->inner}.make_invalid()} {
             this->current = this->lex();
         }
 
@@ -526,7 +655,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             if (!this->current.has_value() ||
                 this->current->type == TokenType::Eof) {
                 this->has_emitted_eof = true;
-                this->current = {};
+                this->current = std::nullopt;
                 return;
             }
 
@@ -535,8 +664,8 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
       private:
         std::string_view data;
-        Span span = Span::invalid();
         Settings settings;
+        Span span;
         std::optional<Token> current;
         bool has_emitted_eof{false};
 
@@ -547,7 +676,8 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         }
 
         constexpr auto get_slice() {
-            return this->data.substr(this->span.index, this->span.length);
+            const auto &pos_span = this->span.get_pos_span();
+            return this->data.substr(pos_span.index, pos_span.length);
         }
 
         [[nodiscard]] auto lex() -> std::optional<Token> {
@@ -580,23 +710,23 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         }
 
         constexpr void drop_whitespace() {
-            while (this->data.length() > this->span.index &&
-                   (this->data[this->span.index] == ';' ||
-                    std::isspace(this->data[this->span.index],
+            const auto &pos_span = this->span.get_pos_span();
+            while (this->data.length() > pos_span.index &&
+                   (this->data[pos_span.index] == ';' ||
+                    std::isspace(this->data[pos_span.index],
                                  this->settings.locale))) {
-                const bool is_comment =
-                    this->data.length() > this->span.index &&
-                    this->data[this->span.index] == ';';
+                const bool is_comment = this->data.length() > pos_span.index &&
+                                        this->data[pos_span.index] == ';';
                 while (is_comment &&
-                       this->span.end_index() < this->data.length() &&
-                       this->data[this->span.end_index()] != '\n') {
-                    this->span += this->data[this->span.end_index()];
+                       pos_span.end_index() < this->data.length() &&
+                       this->data[pos_span.end_index()] != '\n') {
+                    this->span += this->data[pos_span.end_index()];
                 }
 
-                while (this->span.end_index() < this->data.length() &&
-                       std::isspace(this->data[this->span.end_index()],
-                                    this->settings.locale)) {
-                    this->span += this->data[this->span.end_index()];
+                while (pos_span.end_index() < this->data.length() &&
+                       std::isspace(this->data[pos_span.end_index()],
+                                    settings.locale)) {
+                    this->span += this->data[pos_span.end_index()];
                 }
 
                 this->span = std::move(this->span).chop();
@@ -604,17 +734,21 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         }
 
         [[nodiscard]] constexpr auto lex_quoted() -> Token {
-            const char quote = this->data[this->span.index];
+            const auto &pos_span = this->span.get_pos_span();
+            const char quote = this->data[pos_span.index];
             // NOTE: This has to be imperative, as an arbitrary sized window
             //       cannot capture a n+1 sized escape sequence chain. So,
             //       we do this the boring way.
-            bool escape = false;
-            bool complete = false;
-            for (char chara : this->data.substr(this->span.index + 1)) {
+            bool escape{false};
+            bool complete{false};
+            for (char chara : this->data.substr(pos_span.index + 1)) {
                 this->span += chara;
                 if (escape) {
                     escape = false;
-                } else if (chara == '\\') {
+                    continue;
+                }
+
+                if (chara == '\\') {
                     escape = true;
                 } else if (chara == quote) {
                     complete = true;
@@ -624,15 +758,16 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
             if (!complete) {
                 return Token{TokenType::Error, this->span,
-                             ErrorData{"unterminated string slice"}};
+                             ErrorData{"unterminated string"}};
             }
             return Token{TokenType::Atom, this->span, this->get_slice()};
         }
 
         [[nodiscard]] constexpr auto lex_atom() -> Token {
+            const auto &pos_span = this->span.get_pos_span();
             // NOTE: This is safe because substr(length) is defined as the
             //       empty string.
-            const auto tail = this->data.substr(this->span.index + 1);
+            const auto tail = this->data.substr(pos_span.index + 1);
             const auto rest = std::ranges::distance(
                 tail | std::views::take_while([this](char data) -> bool {
                     return !this->is_atom_terminator(data);
@@ -648,24 +783,25 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         }
 
         [[nodiscard]] constexpr auto lex_inner() -> std::optional<Token> {
+            const auto &pos_span = this->span.get_pos_span();
             std::optional<Token> ret;
 
             this->drop_whitespace();
-            if (this->span.index >= this->data.length()) {
+            if (pos_span.index >= this->data.length()) {
                 return std::nullopt;
             }
 
-            // NOTE: This is a custom implementation of `==` that takes into
+            // NOTE: This is a custom implementation of `+=` that takes into
             //       account newlines and the span's debug information
-            this->span += this->data[this->span.index];
+            this->span += this->data[pos_span.index];
 
-            const char cur = this->data[this->span.index];
+            const char cur = this->data[pos_span.index];
             if (this->settings.quote_characters.contains(cur)) {
                 ret = this->lex_quoted();
             } else if (cur == '.' &&
-                       (this->data.length() <= this->span.index + 1 ||
-                        std::isspace(this->data[this->span.index + 1],
-                                     this->settings.locale))) {
+                       (this->data.length() <= pos_span.index + 1 ||
+                        Iterator::is_atom_terminator(
+                            this->data[pos_span.index + 1]))) {
                 ret = Token{TokenType::ListTerminator, this->span,
                             this->get_slice()};
             } else if (cur == '(') {
@@ -677,7 +813,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
             }
 
             this->span = std::move(this->span).chop();
-            return {ret};
+            return ret;
         }
     };
     static_assert(std::input_iterator<Iterator>);
@@ -751,15 +887,76 @@ using lexer::Lexer;
 
 } // namespace cs2_lib::sexp
 
-template <>
-class std::formatter<cs2_lib::sexp::Span> : public std::formatter<std::string> {
+template <> class std::formatter<cs2_lib::sexp::Span> {
   public:
+    enum class ParseMode : uint8_t {
+        Default,
+        Gnu
+    } parse_mode{ParseMode::Default}; // NOLINT
+
+    constexpr auto parse(std::format_parse_context &ctx) {
+        if (std::string_view{ctx}.starts_with("gnu")) {
+            this->parse_mode = ParseMode::Gnu;
+            ctx.advance_to(ctx.begin() + 3);
+        }
+        return this->underlying.parse(ctx);
+    }
+
     template <class FormatCtx>
     constexpr auto format(cs2_lib::sexp::Span span, FormatCtx &ctx) const {
-        return std::formatter<std::string>::format(
-            std::format("{}:{}:{}-{}:{}", span.file_name, span.begin_line,
-                        span.begin_column, span.end_line, span.end_column),
-            ctx);
+        using Span = cs2_lib::sexp::Span;
+        // NOLINTNEXTLINE(readability-identifier-length)
+        const Span::PositionSpan &ps = span.get_pos_span();
+
+        switch (this->parse_mode) {
+        case ParseMode::Default:
+            return this->underlying.format(
+                std::format("(Span \"{}\" (begin {} {}) (end {} {}) (index {}) "
+                            "(length {}))",
+                            span.file_name, ps.begin_pos.line, ps.begin_pos.col,
+                            ps.end_pos.line, ps.end_pos.col, ps.index,
+                            ps.length),
+                ctx);
+        case ParseMode::Gnu:
+            if (ps.begin_pos == ps.end_pos) {
+                return this->underlying.format(
+                    std::format("{}:{}.{}", span.file_name, ps.begin_pos.line,
+                                ps.begin_pos.col + 1),
+                    ctx);
+            }
+
+            // TODO: Count characters of the underlying stream
+            const Span::Position end_pos =
+                span.file_data[ps.end_index() - 1] == '\n'
+                    ? Span::Position{.line = ps.end_pos.line - 1,
+                                     .col =
+                                         std::formatter<cs2_lib::sexp::Span>::
+                                             get_newline_column(span.file_data,
+                                                                ps.end_index())}
+                    : Span::Position{.line = ps.end_pos.line,
+                                     .col = ps.end_pos.col};
+            return this->underlying.format(
+                std::format("{}:{}.{}-{}.{}", span.file_name, ps.begin_pos.line,
+                            ps.begin_pos.col + 1, end_pos.line, end_pos.col),
+                ctx);
+        }
+        std::unreachable();
+    }
+
+  private:
+    std::formatter<std::string> underlying;
+
+    static constexpr auto get_newline_column(std::string_view src,
+                                             size_t idx) -> size_t {
+        if (idx == 0 || idx - 1 > src.size() || src[idx - 1] != '\n') {
+            throw std::logic_error(
+                "Tried to find end index of newline without the previous character being a newline"
+            );
+        }
+
+        const std::string_view view = src.substr(0, idx - 1);
+        return 1 + view.length() - std::ranges::distance(
+            std::ranges::find(view | std::views::reverse, '\n'), view.rend());
     }
 };
 
@@ -772,9 +969,10 @@ class std::formatter<cs2_lib::sexp::Error>
                           FormatCtx &ctx) const {
 #ifdef CS2LIB_DEBUG
         return std::formatter<std::string>::format(
-            std::format("{}: error: ({}) {}\n{}", err.span, err.subsystem(),
-                        err.error_message,
-                        cs2_lib::sexp::_impl::strace_fmt.format(err.strace)),
+            std::format(
+                "{}: error: ({}) {}\n{}", err.span, err.subsystem(),
+                err.error_message,
+                cs2_lib::sexp::_impl::strace_fmt.format(err.strace.resolve())),
             ctx);
 #else
         return std::formatter<std::string>::format(
@@ -808,16 +1006,11 @@ class std::formatter<cs2_lib::sexp::lexer::TokenType>
             type_name = "atom"sv;
             break;
         case cs2_lib::sexp::lexer::TokenType::Error:
-            type_name = "error";
+            type_name = "error"sv;
             break;
         case cs2_lib::sexp::lexer::TokenType::Eof:
-            type_name = "EOF";
+            type_name = "EOF"sv;
             break;
-        default:
-            throw cs2_lib::sexp::InternalCompilerError(
-                "No string representation for token type ID {}, add it to "
-                "std::formatter<TokenType>",
-                (uint16_t)typ);
         }
 
         return std::formatter<std::string>::format(
@@ -833,7 +1026,7 @@ class std::formatter<cs2_lib::sexp::lexer::ErrorData>
     constexpr auto format(const cs2_lib::sexp::lexer::ErrorData &err,
                           FormatCtx &ctx) const {
         return std::formatter<std::string>::format(
-            std::format("(Error {})", err.message), ctx);
+            std::format("(Error \"{}\")", err.message), ctx);
     }
 };
 
@@ -848,7 +1041,7 @@ class std::formatter<cs2_lib::sexp::lexer::Token>
             [](const auto &data) -> std::string {
                 using T = std::decay_t<decltype(data)>;
                 if constexpr (std::is_same_v<T, std::string_view>) {
-                    return std::string(data);
+                    return data.empty() ? ":empty" : std::format("'{}", data);
                 } else if constexpr (std::is_same_v<
                                          T, cs2_lib::sexp::lexer::ErrorData>) {
                     return std::format("{}", data);
@@ -860,8 +1053,7 @@ class std::formatter<cs2_lib::sexp::lexer::Token>
             },
             tok.data);
         return std::formatter<std::string>::format(
-            std::format("(Token \"{}\" {} '{})", tok.span, tok.type,
-                        formatted_data),
+            std::format("(Token {} {} {})", tok.span, tok.type, formatted_data),
             ctx);
     }
 };
@@ -873,9 +1065,12 @@ constexpr auto operator<<(std::ostream &ost,
 }
 
 namespace cs2_lib::sexp::_impl {
-auto format_ice(cs2_lib::sexp::Span span, std::string_view message)
-    -> std::string {
-    return std::format("{}: error: Internal Compiler Error: {}", span, message);
+auto format_ice(std::optional<cs2_lib::sexp::Span> span,
+                std::string_view message) -> std::string {
+    std::string span_text =
+        span.has_value() ? std::format("{}: ", span.value()) : "";
+    return std::format("{}error: Internal Compiler Error: {}", span_text,
+                       message);
 }
 } // namespace cs2_lib::sexp::_impl
 #endif // HUTZDOG_CS2_LIB_SEXP
