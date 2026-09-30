@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <array>
-#include <mutex>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -238,8 +237,7 @@ TEST_CASE("test the lexer") {
                        .quote_characters = {'"', '`'},
                    }}),
             StCase("\"`\""sv, "terminated_alternate_quotes.vtyp"sv,
-                   lexer::TokenType::Atom, {1, 3}, 3,
-                   "\"`\""sv, 0,
+                   lexer::TokenType::Atom, {1, 3}, 3, "\"`\""sv, 0,
                    Lexer{Settings{
                        .locale = std::locale::classic(),
                        .quote_characters = {'"', '`'},
@@ -267,10 +265,10 @@ TEST_CASE("test the lexer") {
             StCase(". "sv, "terminator_ws.vtyp"sv,
                    lexer::TokenType::ListTerminator, {1, 1}, 1, "."sv),
 
-            StCase("("sv, "left_paren.vtyp"sv,
-                   lexer::TokenType::LParen, {1, 1}, 1),
-            StCase(")"sv, "right_paren.vtyp"sv,
-                   lexer::TokenType::RParen, {1, 1}, 1),
+            StCase("("sv, "left_paren.vtyp"sv, lexer::TokenType::LParen, {1, 1},
+                   1),
+            StCase(")"sv, "right_paren.vtyp"sv, lexer::TokenType::RParen,
+                   {1, 1}, 1),
             StCase("\xff\x80"sv, "high_exotic_character_atom.vtyp"sv,
                    lexer::TokenType::Atom, {1, 2}, 2));
 
@@ -315,544 +313,513 @@ TEST_CASE("test the lexer") {
             }
         };
 
-
         const SmallCase test_case =
             GENERATE(
-                SmallCase(
-                    "(a);comment\nb"sv,
-                    "comment_between_forms.vtyp",
-                    {
-                        {
-                            .type = lexer::TokenType::LParen,
-                            .data = "("sv,
-                            .span =
-                                {
-                                    .begin_pos = {.line = 1, .col = 0},
-                                    .end_pos = {.line = 1, .col = 1},
-                                    .index = 0,
-                                    .length = 1,
-                                },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "a"sv,
-                            .span =
-                                {
-                                    .begin_pos = {.line = 1, .col = 1},
-                                    .end_pos = {.line = 1, .col = 2},
-                                    .index = 1,
-                                    .length = 1,
-                                },
-                        },
-                        {
-                            .type = lexer::TokenType::RParen,
-                            .data = ")"sv,
-                            .span =
-                                {
-                                    .begin_pos = {.line = 1, .col = 2},
-                                    .end_pos = {.line = 1, .col = 3},
-                                    .index = 2,
-                                    .length = 1,
-                                },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "b"sv,
-                            .span =
-                                {
-                                    .begin_pos = {.line = 2, .col = 0},
-                                    .end_pos = {.line = 2, .col = 1},
-                                    .index = 12,
-                                    .length = 1,
+                SmallCase("(a);comment\nb"sv, "comment_between_forms.vtyp",
+                          {
+                              {
+                                  .type = lexer::TokenType::LParen,
+                                  .data = "("sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "a"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 1},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 1,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::RParen,
+                                  .data = ")"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 2},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 2,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "b"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 2, .col = 0},
+                                          .end_pos = {.line = 2, .col = 1},
+                                          .index = 12,
+                                          .length = 1,
 
-                                },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 2, .col = 1},
+                                          .end_pos = {.line = 2, .col = 1},
+                                          .index = 13,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase(R"(abc"def"ghi)", "atom_then_quoted.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "abc"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 0,
+                                          .length = 3,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "\"def\"",
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 8},
+                                          .index = 3,
+                                          .length = 5,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "ghi"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 8},
+                                          .end_pos = {.line = 1, .col = 11},
+                                          .index = 8,
+                                          .length = 3,
+                                      },
+                              },
+                              {.type = lexer::TokenType::Eof,
+                               .data = ""sv,
+                               .span =
+                                   {
+                                       .begin_pos = {.line = 1, .col = 11},
+                                       .end_pos = {.line = 1, .col = 11},
+                                       .index = 11,
+                                       .length = 0,
+                                   }},
+                          }),
+
+                SmallCase(". ."sv, "double_list_terminator.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::ListTerminator,
+                                  .data = "."sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::ListTerminator,
+                                  .data = "."sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 2},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 2,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 3,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("(a .)"sv, "terminator_then_paren.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::LParen,
+                                  .data = "("sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "a"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 1},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 1,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::ListTerminator,
+                                  .data = "."sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 4},
+                                          .index = 3,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::RParen,
+                                  .data = ")"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 4},
+                                          .end_pos = {.line = 1, .col = 5},
+                                          .index = 4,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 5},
+                                          .end_pos = {.line = 1, .col = 5},
+                                          .index = 5,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("(a . b)"sv, "correctly_used_list_terminator.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::LParen,
+                                  .data = "("sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "a"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 1},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 1,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::ListTerminator,
+                                  .data = "."sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 4},
+                                          .index = 3,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "b"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 5},
+                                          .end_pos = {.line = 1, .col = 6},
+                                          .index = 5,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::RParen,
+                                  .data = ")"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 6},
+                                          .end_pos = {.line = 1, .col = 7},
+                                          .index = 6,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 7},
+                                          .end_pos = {.line = 1, .col = 7},
+                                          .index = 7,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("(a .;comment"sv, "terminator_then_comment.vtyp",
+                          {
+                              {
+                                  .type = lexer::TokenType::LParen,
+                                  .data = "("sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "a"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 1},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 1,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::ListTerminator,
+                                  .data = "."sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 4},
+                                          .index = 3,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 12},
+                                          .end_pos = {.line = 1, .col = 12},
+                                          .index = 12,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("`a`\"b\""sv, "back_to_back_quotes.vtyp"sv,
+                          Lexer{Settings{.quote_characters = {'"', '`'}}},
+                          {
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "`a`"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 0,
+                                          .length = 3,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "\"b\""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 6},
+                                          .index = 3,
+                                          .length = 3,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 6},
+                                          .end_pos = {.line = 1, .col = 6},
+                                          .index = 6,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("\"foo bar\""sv, "back_to_back_quotes.vtyp"sv,
+                          Lexer{Settings{.quote_characters = {}}},
+                          {{
+                               .type = lexer::TokenType::Atom,
+                               .data = "\"foo"sv,
+                               .span =
+                                   {
+                                       .begin_pos = {.line = 1, .col = 0},
+                                       .end_pos = {.line = 1, .col = 4},
+                                       .index = 0,
+                                       .length = 4,
+                                   },
+                           },
+                           {
+                               .type = lexer::TokenType::Atom,
+                               .data = "bar\""sv,
+                               .span =
+                                   {
+                                       .begin_pos = {.line = 1, .col = 5},
+                                       .end_pos = {.line = 1, .col = 9},
+                                       .index = 5,
+                                       .length = 4,
+                                   },
+                           },
+                           {.type = lexer::TokenType::Eof,
                             .data = ""sv,
                             .span =
                                 {
-                                    .begin_pos = {.line = 2, .col = 1},
-                                    .end_pos = {.line = 2, .col = 1},
-                                    .index = 13,
+                                    .begin_pos = {.line = 1, .col = 9},
+                                    .end_pos = {.line = 1, .col = 9},
+                                    .index = 9,
                                     .length = 0,
-                                },
-                        },
-                    }),
+                                }}}),
+
+                SmallCase("(\0"sv, "null_byte_at_eof.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::LParen,
+                                  .data = "("sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 1},
+                                          .index = 0,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "\0"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 1},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 1,
+                                          .length = 1,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 2},
+                                          .end_pos = {.line = 1, .col = 2},
+                                          .index = 2,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
+
+                SmallCase("a\0b\"a\0b\""sv,
+                          "null_inside_atom_and_string.vtyp"sv,
+                          {
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "a\0b"sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 0},
+                                          .end_pos = {.line = 1, .col = 3},
+                                          .index = 0,
+                                          .length = 3,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Atom,
+                                  .data = "\"a\0b\""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 3},
+                                          .end_pos = {.line = 1, .col = 8},
+                                          .index = 3,
+                                          .length = 5,
+                                      },
+                              },
+                              {
+                                  .type = lexer::TokenType::Eof,
+                                  .data = ""sv,
+                                  .span =
+                                      {
+                                          .begin_pos = {.line = 1, .col = 8},
+                                          .end_pos = {.line = 1, .col = 8},
+                                          .index = 8,
+                                          .length = 0,
+                                      },
+                              },
+                          }),
 
                 SmallCase(
-                    R"(abc"def"ghi)",
-                    "atom_then_quoted.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "abc"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 3},
-                                .index = 0,
-                                .length = 3,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "\"def\"",
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 8},
-                                .index = 3,
-                                .length = 5,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "ghi"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 8},
-                                .end_pos = {.line = 1, .col = 11},
-                                .index = 8,
-                                .length = 3,
-                            },
-                        },
-                        {.type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 11},
-                                .end_pos = {.line = 1, .col = 11},
-                                .index = 11,
-                                .length = 0,
-                            }},
-                    }),
-
-                SmallCase(
-                    ". ."sv,
-                    "double_list_terminator.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::ListTerminator,
-                            .data = "."sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 1},
-                                .index = 0,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::ListTerminator,
-                            .data = "."sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 2},
-                                .end_pos = {.line = 1, .col = 3},
-                                .index = 2,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 3},
-                                .index = 3,
-                                .length = 0,
-                            },
-                        },
-                    }),
-
-                SmallCase(
-                    "(a .)"sv,
-                    "terminator_then_paren.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::LParen,
-                            .data = "("sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 1},
-                                .index = 0,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "a"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 1},
-                                .end_pos = {.line = 1, .col = 2},
-                                .index = 1,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::ListTerminator,
-                            .data = "."sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 4},
-                                .index = 3,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::RParen,
-                            .data = ")"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 4},
-                                .end_pos = {.line = 1, .col = 5},
-                                .index = 4,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 5},
-                                .end_pos = {.line = 1, .col = 5},
-                                .index = 5,
-                                .length = 0,
-                            },
-                        },
-                    }),
-
-                SmallCase(
-                    "(a . b)"sv,
-                    "correctly_used_list_terminator.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::LParen,
-                            .data = "("sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 1},
-                                .index = 0,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "a"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 1},
-                                .end_pos = {.line = 1, .col = 2},
-                                .index = 1,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::ListTerminator,
-                            .data = "."sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 4},
-                                .index = 3,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "b"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 5},
-                                .end_pos = {.line = 1, .col = 6},
-                                .index = 5,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::RParen,
-                            .data = ")"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 6},
-                                .end_pos = {.line = 1, .col = 7},
-                                .index = 6,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 7},
-                                .end_pos = {.line = 1, .col = 7},
-                                .index = 7,
-                                .length = 0,
-                            },
-                        },
-                    }),
-
-                SmallCase(
-                    "(a .;comment"sv,
-                    "terminator_then_comment.vtyp",
-                    {
-                        {
-                            .type = lexer::TokenType::LParen,
-                            .data = "("sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 1},
-                                .index = 0,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "a"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 1},
-                                .end_pos = {.line = 1, .col = 2},
-                                .index = 1,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::ListTerminator,
-                            .data = "."sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 4},
-                                .index = 3,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 12},
-                                .end_pos = {.line = 1, .col = 12},
-                                .index = 12,
-                                .length = 0,
-                            },
-                        },
-                    }
-                ),
-
-                SmallCase(
-                    "`a`\"b\""sv,
-                    "back_to_back_quotes.vtyp"sv,
-                    Lexer{Settings{.quote_characters = {'"', '`'}}},
-                    {
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "`a`"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 3},
-                                .index = 0,
-                                .length = 3,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "\"b\""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 6},
-                                .index = 3,
-                                .length = 3,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 6},
-                                .end_pos = {.line = 1, .col = 6},
-                                .index = 6,
-                                .length = 0,
-                            },
-                        },
-                    }
-                ),
-
-                SmallCase(
-                    "\"foo bar\""sv,
-                    "back_to_back_quotes.vtyp"sv,
-                    Lexer{Settings{.quote_characters = {}}},
-                    {
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "\"foo"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 4},
-                                .index = 0,
-                                .length = 4,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "bar\""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 5},
-                                .end_pos = {.line = 1, .col = 9},
-                                .index = 5,
-                                .length = 4,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 9},
-                                .end_pos = {.line = 1, .col = 9},
-                                .index = 9,
-                                .length = 0,
-                            }
-                        }
-                    }
-                ),
-
-                SmallCase(
-                    "(\0"sv,
-                    "null_byte_at_eof.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::LParen,
-                            .data = "("sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 1},
-                                .index = 0,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "\0"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 1},
-                                .end_pos = {.line = 1, .col = 2},
-                                .index = 1,
-                                .length = 1,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 2},
-                                .end_pos = {.line = 1, .col = 2},
-                                .index = 2,
-                                .length = 0,
-                            },
-                        },
-                    }
-                ),
-
-                SmallCase(
-                    "a\0b\"a\0b\""sv,
-                    "null_inside_atom_and_string.vtyp"sv,
-                    {
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "a\0b"sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 3},
-                                .index = 0,
-                                .length = 3,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Atom,
-                            .data = "\"a\0b\""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 3},
-                                .end_pos = {.line = 1, .col = 8},
-                                .index = 3,
-                                .length = 5,
-                            },
-                        },
-                        {
-                            .type = lexer::TokenType::Eof,
-                            .data = ""sv,
-                            .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 8},
-                                .end_pos = {.line = 1, .col = 8},
-                                .index = 8,
-                                .length = 0,
-                            },
-                        },
-                    }
-                ),
-
-                SmallCase(
-                    "\"ok\" \"bad"sv,
-                    "ok_then_error_token.vtyp"sv,
+                    "\"ok\" \"bad"sv, "ok_then_error_token.vtyp"sv,
                     {
                         {
                             .type = lexer::TokenType::Atom,
                             .data = "\"ok\"",
                             .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 0},
-                                .end_pos = {.line = 1, .col = 4},
-                                .index = 0,
-                                .length = 4,
-                            },
+                                {
+                                    .begin_pos = {.line = 1, .col = 0},
+                                    .end_pos = {.line = 1, .col = 4},
+                                    .index = 0,
+                                    .length = 4,
+                                },
                         },
                         {
                             .type = lexer::TokenType::Error,
                             .data = lexer::ErrorData{"unterminated string"},
                             .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 5},
-                                .end_pos = {.line = 1, .col = 9},
-                                .index = 5,
-                                .length = 4,
-                            },
+                                {
+                                    .begin_pos = {.line = 1, .col = 5},
+                                    .end_pos = {.line = 1, .col = 9},
+                                    .index = 5,
+                                    .length = 4,
+                                },
                         },
                         {
                             .type = lexer::TokenType::Eof,
                             .data = ""sv,
                             .span =
-                            {
-                                .begin_pos = {.line = 1, .col = 9},
-                                .end_pos = {.line = 1, .col = 9},
-                                .index = 9,
-                                .length = 0,
+                                {
+                                    .begin_pos = {.line = 1, .col = 9},
+                                    .end_pos = {.line = 1, .col = 9},
+                                    .index = 9,
+                                    .length = 0,
 
-                            },
+                                },
                         },
-                    }
-                ));
+                    }));
 
         const auto lexer = test_case.lexer(test_case.file_name);
         [[maybe_unused]] uint64_t len{};
@@ -933,7 +900,7 @@ TEST_CASE("fuzz the lexer") {
 
         std::array<std::optional<std::jthread>, CS2LIB_FUZZ_THREADS> threads;
         for (size_t thread{}; thread < thread_count; thread++) {
-            threads[thread].emplace([&] -> void {
+            threads[thread].emplace([&] -> void { // NOLINT
                 std::optional<FailureInfo> failure_info{};
 
                 [[maybe_unused]] std::string buf(category.len, '\0');
@@ -952,14 +919,132 @@ TEST_CASE("fuzz the lexer") {
                             }
 
                             for (auto tok : buf | lexer("test.sexp")) {
-                                static_cast<void>(tok);
+                                using cs2_lib::sexp::Span;
+                                using cs2_lib::sexp::lexer::ErrorData;
+                                using cs2_lib::sexp::lexer::TokenType;
+                                const std::string_view src{buf};
+
+                                // One cursor walks every byte of the input
+                                // exactly once: first through the gap before
+                                // each token, then through the token.
+                                uint64_t cur_index = 0;
+                                Span::Position cur_pos{.line = 1, .col = 0};
+                                bool seen_eof = false;
+                                const auto advance = [&](char chara) {
+                                    if (chara == '\n') {
+                                        cur_pos.line++;
+                                        cur_pos.col = 0;
+                                    } else {
+                                        cur_pos.col++;
+                                    }
+                                    cur_index++;
+                                };
+
+                                for (const auto tok :
+                                     src | lexer("test.sexp")) {
+                                    const auto &pos = tok.span.get_pos_span();
+
+                                    // Cheap integer checks first
+                                    if (seen_eof) {
+                                        throw std::string{"token after EOF"};
+                                    }
+                                    if (pos.index < cur_index) {
+                                        throw std::format(
+                                            "token at index {} overlaps the "
+                                            "previous one (ends at {})",
+                                            pos.index, cur_index);
+                                    }
+                                    if (pos.end_index() > src.size()) {
+                                        throw std::format(
+                                            "token ends at {}, past the "
+                                            "input's end at {}",
+                                            pos.end_index(), src.size());
+                                    }
+
+                                    // The gap may only contain whitespace and
+                                    // ';' comments
+                                    bool in_comment = false;
+                                    while (cur_index < pos.index) {
+                                        const char chara = src[cur_index];
+                                        if (in_comment) {
+                                            in_comment = chara != '\n';
+                                        } else if (chara == ';') {
+                                            in_comment = true;
+                                        } else if (!std::isspace(
+                                                       chara, std::locale::
+                                                                  classic())) {
+                                            throw std::format(
+                                                "skipped byte {:#04x} at index "
+                                                "{}",
+                                                static_cast<unsigned char>(
+                                                    chara),
+                                                cur_index);
+                                        }
+                                        advance(chara);
+                                    }
+
+                                    if (pos.begin_pos != cur_pos) {
+                                        throw std::format(
+                                            "begin {}:{} but recounted {}:{}",
+                                            pos.begin_pos.line,
+                                            pos.begin_pos.col, cur_pos.line,
+                                            cur_pos.col);
+                                    }
+                                    while (cur_index < pos.end_index()) {
+                                        advance(src[cur_index]);
+                                    }
+                                    if (pos.end_pos != cur_pos) {
+                                        throw std::format(
+                                            "end {}:{} but recounted {}:{}",
+                                            pos.end_pos.line, pos.end_pos.col,
+                                            cur_pos.line, cur_pos.col);
+                                    }
+
+                                    // Per-type rules
+                                    if (tok.type == TokenType::Eof) {
+                                        seen_eof = true;
+                                        if (pos.length != 0 ||
+                                            pos.index != src.size()) {
+                                            throw std::string{
+                                                "EOF is not a zero-length "
+                                                "token at the end"};
+                                        }
+                                    } else if (pos.length == 0) {
+                                        throw std::string{
+                                            "zero-length token that isn't EOF"};
+                                    } else if (tok.type == TokenType::Error) {
+                                        if (!std::holds_alternative<ErrorData>(
+                                                tok.data)) {
+                                            throw std::string{
+                                                "error token without "
+                                                "ErrorData"};
+                                        }
+                                    } else {
+                                        // Data must be a view of exactly this
+                                        // token's bytes: O(1)
+                                        const auto *data =
+                                            std::get_if<std::string_view>(
+                                                &tok.data);
+                                        if (data == nullptr ||
+                                            data->data() !=
+                                                src.data() + pos.index ||
+                                            data->size() != pos.length) {
+                                            throw std::string{
+                                                "token data is not its slice "
+                                                "of the input"};
+                                        }
+                                    }
+                                }
+                                if (!seen_eof) {
+                                    throw std::string{
+                                        "stream ended without an EOF token"};
+                                }
                             }
-                        } catch (const cs2_lib::sexp::InternalCompilerError &ice) {
+                        } catch (
+                            const cs2_lib::sexp::InternalCompilerError &ice) {
                             if (!failure_info.has_value()) {
                                 failure_info.emplace(
-                                    index,
-                                    std::format("ICE: {}", ice.what())
-                                );
+                                    index, std::format("ICE: {}", ice.what()));
                             } else {
                                 failure_info.value().count++;
                             }
@@ -967,25 +1052,21 @@ TEST_CASE("fuzz the lexer") {
                             if (!failure_info.has_value()) {
                                 failure_info.emplace(
                                     index,
-                                    std::format("Exception: {}", ex.what())
-                                );
+                                    std::format("Exception: {}", ex.what()));
                             } else {
                                 failure_info.value().count++;
                             }
                         } catch (const std::string &data) {
                             if (!failure_info.has_value()) {
                                 failure_info.emplace(
-                                    index,
-                                    std::format("Test error: {}", data)
-                                );
+                                    index, std::format("Test error: {}", data));
                             } else {
                                 failure_info.value().count++;
                             }
                         } catch (...) {
                             if (!failure_info.has_value()) {
-                                failure_info.emplace(
-                                    index, "Unknown exception"
-                                );
+                                failure_info.emplace(index,
+                                                     "Unknown exception");
                             } else {
                                 failure_info.value().count++;
                             }
@@ -994,11 +1075,12 @@ TEST_CASE("fuzz the lexer") {
                 }
 
                 if (failure_info.has_value()) {
-                    CHECK_MESSAGE(!failure_info.has_value(), std::format(
-                                  "Failure at index {} and {} others: {}",
-                                  failure_info.value().first_index,
-                                  failure_info.value().count - 1,
-                                  failure_info.value().data));
+                    CHECK_MESSAGE(
+                        !failure_info.has_value(),
+                        std::format("Failure at index {} and {} others: {}",
+                                    failure_info.value().first_index,
+                                    failure_info.value().count - 1,
+                                    failure_info.value().data));
                 }
             });
         }

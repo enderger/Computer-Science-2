@@ -946,17 +946,18 @@ template <> class std::formatter<cs2_lib::sexp::Span> {
   private:
     std::formatter<std::string> underlying;
 
-    static constexpr auto get_newline_column(std::string_view src,
-                                             size_t idx) -> size_t {
+    static constexpr auto get_newline_column(std::string_view src, size_t idx)
+        -> size_t {
         if (idx == 0 || idx - 1 > src.size() || src[idx - 1] != '\n') {
-            throw std::logic_error(
-                "Tried to find end index of newline without the previous character being a newline"
-            );
+            throw std::logic_error("Tried to find end index of newline without "
+                                   "the previous character being a newline");
         }
 
         const std::string_view view = src.substr(0, idx - 1);
-        return 1 + view.length() - std::ranges::distance(
-            std::ranges::find(view | std::views::reverse, '\n'), view.rend());
+        return 1 + view.length() -
+               std::ranges::distance(
+                   std::ranges::find(view | std::views::reverse, '\n'),
+                   view.rend());
     }
 };
 
