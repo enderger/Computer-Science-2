@@ -17,6 +17,7 @@
 #ifndef HUTZDOG_CS2_LIB_SEXP
 #define HUTZDOG_CS2_LIB_SEXP
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
@@ -27,6 +28,7 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <typeinfo>
@@ -948,7 +950,7 @@ template <> class std::formatter<cs2_lib::sexp::Span> {
 
     static constexpr auto get_newline_column(std::string_view src, size_t idx)
         -> size_t {
-        if (idx == 0 || idx - 1 > src.size() || src[idx - 1] != '\n') {
+        if (idx == 0 || idx > src.size() || src[idx - 1] != '\n') {
             throw std::logic_error("Tried to find end index of newline without "
                                    "the previous character being a newline");
         }

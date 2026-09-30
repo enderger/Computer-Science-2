@@ -303,7 +303,7 @@ TEST_CASE("test the lexer") {
                                 std::string_view file_name, Lexer lexer,
                                 std::vector<ProtoToken> tokens)
                 : text{text}, file_name{file_name}, lexer{std::move(lexer)} {
-                tokens.reserve(tokens.size());
+                this->tokens.reserve(tokens.size());
                 const Span::Factory span_factory{file_name, text};
                 for (ProtoToken &proto : tokens) {
                     this->tokens.emplace_back(std::move(proto.type),
@@ -673,7 +673,7 @@ TEST_CASE("test the lexer") {
                               },
                           }),
 
-                SmallCase("\"foo bar\""sv, "back_to_back_quotes.vtyp"sv,
+                SmallCase("\"foo bar\""sv, "no_quote_characters.vtyp"sv,
                           Lexer{Settings{.quote_characters = {}}},
                           {{
                                .type = lexer::TokenType::Atom,
@@ -832,16 +832,17 @@ TEST_CASE("test the lexer") {
     }
 
     SUBCASE("miscellaneous tests") {
-        SUBCASE("increment past end")
-        CHECK_THROWS_AS(
-            [&] {
-                auto token_stream = ""sv | lexer("empty.vtyp");
-                auto iter = token_stream.begin();
-                iter++;
-                iter++;
-                (void)*iter;
-            }(),
-            InternalCompilerError);
+        SUBCASE("increment past end") {
+            CHECK_THROWS_AS(
+                [&] {
+                    auto token_stream = ""sv | lexer("empty.vtyp");
+                    auto iter = token_stream.begin();
+                    iter++;
+                    iter++;
+                    (void)*iter;
+                }(),
+                InternalCompilerError);
+        }
     }
 }
 
@@ -918,128 +919,124 @@ TEST_CASE("fuzz the lexer") {
                                 pos /= alpha_len;
                             }
 
-                            for (auto tok : buf | lexer("test.sexp")) {
-                                using cs2_lib::sexp::Span;
-                                using cs2_lib::sexp::lexer::ErrorData;
-                                using cs2_lib::sexp::lexer::TokenType;
-                                const std::string_view src{buf};
+                            // BEGIN AI CODE
+                            using cs2_lib::sexp::Span;
+                            using cs2_lib::sexp::lexer::ErrorData;
+                            using cs2_lib::sexp::lexer::TokenType;
+                            const std::string_view src{buf};
 
-                                // One cursor walks every byte of the input
-                                // exactly once: first through the gap before
-                                // each token, then through the token.
-                                uint64_t cur_index = 0;
-                                Span::Position cur_pos{.line = 1, .col = 0};
-                                bool seen_eof = false;
-                                const auto advance = [&](char chara) {
-                                    if (chara == '\n') {
-                                        cur_pos.line++;
-                                        cur_pos.col = 0;
-                                    } else {
-                                        cur_pos.col++;
-                                    }
-                                    cur_index++;
-                                };
-
-                                for (const auto tok :
-                                     src | lexer("test.sexp")) {
-                                    const auto &pos = tok.span.get_pos_span();
-
-                                    // Cheap integer checks first
-                                    if (seen_eof) {
-                                        throw std::string{"token after EOF"};
-                                    }
-                                    if (pos.index < cur_index) {
-                                        throw std::format(
-                                            "token at index {} overlaps the "
-                                            "previous one (ends at {})",
-                                            pos.index, cur_index);
-                                    }
-                                    if (pos.end_index() > src.size()) {
-                                        throw std::format(
-                                            "token ends at {}, past the "
-                                            "input's end at {}",
-                                            pos.end_index(), src.size());
-                                    }
-
-                                    // The gap may only contain whitespace and
-                                    // ';' comments
-                                    bool in_comment = false;
-                                    while (cur_index < pos.index) {
-                                        const char chara = src[cur_index];
-                                        if (in_comment) {
-                                            in_comment = chara != '\n';
-                                        } else if (chara == ';') {
-                                            in_comment = true;
-                                        } else if (!std::isspace(
-                                                       chara, std::locale::
-                                                                  classic())) {
-                                            throw std::format(
-                                                "skipped byte {:#04x} at index "
-                                                "{}",
-                                                static_cast<unsigned char>(
-                                                    chara),
-                                                cur_index);
-                                        }
-                                        advance(chara);
-                                    }
-
-                                    if (pos.begin_pos != cur_pos) {
-                                        throw std::format(
-                                            "begin {}:{} but recounted {}:{}",
-                                            pos.begin_pos.line,
-                                            pos.begin_pos.col, cur_pos.line,
-                                            cur_pos.col);
-                                    }
-                                    while (cur_index < pos.end_index()) {
-                                        advance(src[cur_index]);
-                                    }
-                                    if (pos.end_pos != cur_pos) {
-                                        throw std::format(
-                                            "end {}:{} but recounted {}:{}",
-                                            pos.end_pos.line, pos.end_pos.col,
-                                            cur_pos.line, cur_pos.col);
-                                    }
-
-                                    // Per-type rules
-                                    if (tok.type == TokenType::Eof) {
-                                        seen_eof = true;
-                                        if (pos.length != 0 ||
-                                            pos.index != src.size()) {
-                                            throw std::string{
-                                                "EOF is not a zero-length "
-                                                "token at the end"};
-                                        }
-                                    } else if (pos.length == 0) {
-                                        throw std::string{
-                                            "zero-length token that isn't EOF"};
-                                    } else if (tok.type == TokenType::Error) {
-                                        if (!std::holds_alternative<ErrorData>(
-                                                tok.data)) {
-                                            throw std::string{
-                                                "error token without "
-                                                "ErrorData"};
-                                        }
-                                    } else {
-                                        // Data must be a view of exactly this
-                                        // token's bytes: O(1)
-                                        const auto *data =
-                                            std::get_if<std::string_view>(
-                                                &tok.data);
-                                        if (data == nullptr ||
-                                            data->data() !=
-                                                src.data() + pos.index ||
-                                            data->size() != pos.length) {
-                                            throw std::string{
-                                                "token data is not its slice "
-                                                "of the input"};
-                                        }
-                                    }
+                            // One cursor walks every byte of the input
+                            // exactly once: first through the gap before
+                            // each token, then through the token.
+                            uint64_t cur_index = 0;
+                            Span::Position cur_pos{.line = 1, .col = 0};
+                            bool seen_eof = false;
+                            const auto advance = [&](char chara) {
+                                if (chara == '\n') {
+                                    cur_pos.line++;
+                                    cur_pos.col = 0;
+                                } else {
+                                    cur_pos.col++;
                                 }
-                                if (!seen_eof) {
+                                cur_index++;
+                            };
+
+                            for (const auto tok : src | lexer("test.sexp")) {
+                                const auto &pos = tok.span.get_pos_span();
+
+                                // Cheap integer checks first
+                                if (seen_eof) {
+                                    throw std::string{"token after EOF"};
+                                }
+                                if (pos.index < cur_index) {
+                                    throw std::format(
+                                        "token at index {} overlaps the "
+                                        "previous one (ends at {})",
+                                        pos.index, cur_index);
+                                }
+                                if (pos.end_index() > src.size()) {
+                                    throw std::format(
+                                        "token ends at {}, past the "
+                                        "input's end at {}",
+                                        pos.end_index(), src.size());
+                                }
+
+                                // The gap may only contain whitespace and
+                                // ';' comments
+                                bool in_comment = false;
+                                while (cur_index < pos.index) {
+                                    const char chara = src[cur_index];
+                                    if (in_comment) {
+                                        in_comment = chara != '\n';
+                                    } else if (chara == ';') {
+                                        in_comment = true;
+                                    } else if (!std::isspace(
+                                                   chara,
+                                                   std::locale::classic())) {
+                                        throw std::format(
+                                            "skipped byte {:#04x} at index "
+                                            "{}",
+                                            static_cast<unsigned char>(chara),
+                                            cur_index);
+                                    }
+                                    advance(chara);
+                                }
+
+                                if (pos.begin_pos != cur_pos) {
+                                    throw std::format(
+                                        "begin {}:{} but recounted {}:{}",
+                                        pos.begin_pos.line, pos.begin_pos.col,
+                                        cur_pos.line, cur_pos.col);
+                                }
+                                while (cur_index < pos.end_index()) {
+                                    advance(src[cur_index]);
+                                }
+                                if (pos.end_pos != cur_pos) {
+                                    throw std::format(
+                                        "end {}:{} but recounted {}:{}",
+                                        pos.end_pos.line, pos.end_pos.col,
+                                        cur_pos.line, cur_pos.col);
+                                }
+
+                                // Per-type rules
+                                if (tok.type == TokenType::Eof) {
+                                    seen_eof = true;
+                                    if (pos.length != 0 ||
+                                        pos.index != src.size()) {
+                                        throw std::string{
+                                            "EOF is not a zero-length "
+                                            "token at the end"};
+                                    }
+                                } else if (pos.length == 0) {
                                     throw std::string{
-                                        "stream ended without an EOF token"};
+                                        "zero-length token that isn't EOF"};
+                                } else if (tok.type == TokenType::Error) {
+                                    if (!std::holds_alternative<ErrorData>(
+                                            tok.data)) {
+                                        throw std::string{"error token without "
+                                                          "ErrorData"};
+                                    }
+                                } else {
+                                    // Data must be a view of exactly this
+                                    // token's bytes: O(1)
+                                    const auto *data =
+                                        std::get_if<std::string_view>(
+                                            &tok.data);
+                                    if (data == nullptr ||
+                                        data->data() !=
+                                            src.data() + pos.index ||
+                                        data->size() != pos.length) {
+                                        throw std::string{
+                                            "token data is not its slice "
+                                            "of the input"};
+                                    }
                                 }
                             }
+                            if (!seen_eof) {
+                                throw std::string{
+                                    "stream ended without an EOF token"};
+                            }
+                            // END AI CODE
                         } catch (
                             const cs2_lib::sexp::InternalCompilerError &ice) {
                             if (!failure_info.has_value()) {
@@ -1070,18 +1067,20 @@ TEST_CASE("fuzz the lexer") {
                             } else {
                                 failure_info.value().count++;
                             }
-                        };
+                        }
                     }
                 }
 
-                if (failure_info.has_value()) {
-                    CHECK_MESSAGE(
-                        !failure_info.has_value(),
-                        std::format("Failure at index {} and {} others: {}",
-                                    failure_info.value().first_index,
-                                    failure_info.value().count - 1,
-                                    failure_info.value().data));
-                }
+                // NOTE: This is reliant on message construction being lazy.
+                //       If that changes, this test WILL break with
+                //       std::bad_optional_access from .value() and
+                //       std::terminate (due to noexcept on std::jthread)
+                CHECK_MESSAGE(
+                    !failure_info.has_value(),
+                    std::format("Failure at index {} and {} others: {}",
+                                failure_info.value().first_index,
+                                failure_info.value().count - 1,
+                                failure_info.value().data));
             });
         }
     }
@@ -1120,7 +1119,7 @@ TEST_CASE("other tests") {
                              "basic_formatting.vtyp"sv, "tacocat"sv),
                      GnuTest("{}:1.1-1.4",
                              {.begin_pos = {1, 0},
-                              .end_pos = {2, 1},
+                              .end_pos = {2, 0},
                               .index = 0,
                               .length = 4},
                              "newline_ending.vtyp"sv, "No.\n"sv),
@@ -1129,7 +1128,25 @@ TEST_CASE("other tests") {
                               .end_pos = {1, 0},
                               .index = 0,
                               .length = 0},
-                             "empty_file.vtyp"sv, ""sv));
+                             "empty_file.vtyp"sv, ""sv),
+                     GnuTest("{}:1.2",
+                             {.begin_pos = {1, 1},
+                              .end_pos = {1, 1},
+                              .index = 1,
+                              .length = 0},
+                             "eof_after_token.vtyp"sv, "x"sv),
+                     GnuTest("{}:1.1-2.3",
+                             {.begin_pos = {1, 0},
+                              .end_pos = {2, 3},
+                              .index = 0,
+                              .length = 7},
+                             "newline_in_span.vtyp"sv, "foo\nbar"sv),
+                     GnuTest("{}:1.1-2.1",
+                             {.begin_pos = {1, 0},
+                              .end_pos = {3, 0},
+                              .index = 0,
+                              .length = 3},
+                             "double_newline.vtyp"sv, "a\n\n"sv));
 
         CHECK(test.expected == std::format("{:gnu}", test.span));
     }
