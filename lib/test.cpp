@@ -12,18 +12,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Generated from template
  */
-#include <print>
-
-#include "include/week3-problem1.hpp"
-
-using namespace std::string_view_literals;
-
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
-}
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>

@@ -15,15 +15,22 @@
  *
  * Generated from template
  */
-#include <print>
+#ifndef HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEMe1
+#define HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEMe1
 
-#include "include/week3-problem1.hpp"
-
-using namespace std::string_view_literals;
-
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+#include <concepts>
+namespace hutzdog_cs2_week6 {
+///
+/// Compute the factorial of a number
+/// \param n The number whose factorial should be computed
+/// \return The factorial of the number
+///
+template <std::unsigned_integral T> constexpr auto factorial(T n) -> T {
+    if (n == 0) {
+        return 1;
+    }
+    return n * factorial(n - 1);
 }
+} // namespace hutzdog_cs2_week6
+
+#endif // HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEMe1

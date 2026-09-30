@@ -15,15 +15,20 @@
  *
  * Generated from template
  */
-#include <print>
+#include <doctest/doctest.h>
 
-#include "include/week3-problem1.hpp"
+#include "include/week6-problemE2.hpp"
 
 using namespace std::string_view_literals;
 
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+// IMPLEMENTATION
+
+// TESTS
+// TODO: Implement the tests here
+TEST_CASE("testing the sum_of_digits function") {
+    CHECK(hutzdog_cs2_week6::sum_of_digits(0U) == 0U);
+    CHECK(hutzdog_cs2_week6::sum_of_digits(1U) == 1U);
+    CHECK(hutzdog_cs2_week6::sum_of_digits(10U) == 1U);
+    CHECK(hutzdog_cs2_week6::sum_of_digits(16U) == 7U);
+    CHECK(hutzdog_cs2_week6::sum_of_digits(128U) == 11U);
 }

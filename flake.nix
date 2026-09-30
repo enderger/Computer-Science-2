@@ -15,7 +15,7 @@
   description = "C++23 Computer Science 2 coursework monorepo";
 
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2605.1012336";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2605.*";
     flake-schemas.url = "https://flakehub.com/f/DeterminateSystems/flake-schemas/0.5.0";
     git-hooks = {
       url = "https://flakehub.com/f/cachix/git-hooks.nix/0.1.1233";
@@ -59,6 +59,8 @@
               llvm.clang
               llvm.clang-tools
               llvm.lldb
+              pkgs.cmake
+              pkgs.cpptrace
               pkgs.meson
               pkgs.mesonlsp
               pkgs.doctest
@@ -120,11 +122,18 @@
           ...
         }:
         let
-          baseTools = [
+          base-tools = [
             llvm.clang
             pkgs.meson
+            pkgs.cmake
             pkgs.ninja
+            pkgs.cpptrace
             pkgs.doctest
+            pkgs.pkg-config
+          ];
+
+          base-depends = [
+            pkgs.cpptrace
             pkgs.pkg-config
           ];
 
@@ -222,6 +231,26 @@
               '';
             };
 
+          cs2-lib = llvm.stdenv.mkDerivation {
+            pname = "cs2-lib";
+            version = "0.1.0";
+            outputs = [
+              "out"
+              "doc"
+            ];
+            src = ./lib;
+            doCheck = true;
+            dontUseCmakeConfigure = true;
+            mesonFlags = [ "--buildtype=release" ];
+            mesonCheckFlags = [ "--suite=basic" ];
+
+            nativeBuildInputs = base-tools ++ [ (substituteDoxygen { name = "cs2-lib"; }) ];
+            buildInputs = base-depends;
+            postBuild = ''
+              substitute-doxygen "$doc" "$src"
+            '';
+          };
+
           mkProject =
             name:
             let
@@ -229,7 +258,11 @@
             in
             llvm.stdenv.mkDerivation (
               extendDerivationAttrs
-                { nativeBuildInputs = baseTools ++ [ (substituteDoxygen { inherit name; }) ]; }
+                {
+                  nativeBuildInputs = base-tools ++ [ (substituteDoxygen { inherit name; }) ];
+                  buildInputs = base-depends ++ [ cs2-lib ];
+                  dontUseCmakeConfigure = true;
+                }
                 (
                   {
                     pname = name;
@@ -251,6 +284,7 @@
         in
         projectPackages
         // {
+          inherit cs2-lib;
           assignments = llvm.stdenv.mkDerivation {
             pname = "compsci2-assignments";
             version = "0.1.0";
@@ -262,7 +296,11 @@
             doCheck = true;
             mesonFlags = [ "--buildtype=release" ];
 
-            nativeBuildInputs = baseTools ++ [ (substituteDoxygen { name = "assignments"; }) ];
+            dontUseCmakeConfigure = true;
+            nativeBuildInputs = base-tools ++ [
+              (substituteDoxygen { name = "assignments"; })
+            ];
+            buildInputs = base-depends ++ [ self.packages.${system}.cs2-lib ];
             postBuild = ''
               substitute-doxygen "$doc" "$src"
             '';
@@ -355,6 +393,14 @@
 
       checks = forEachSupportedSystem (
         { pkgs, system, ... }: {
+          cs2-lib = self.packages.${system}.cs2-lib.overrideAttrs (_: {
+            mesonFlags = [
+              "-Db_sanitize=address,undefined"
+              "-Dcpp_args=-fno-sanitize-recover=undefined"
+              "-Db_lundef=false"
+            ];
+            doCheck = true;
+          });
           assignments = self.packages.${system}.assignments.overrideAttrs (_: {
             mesonFlags = [
               "-Db_sanitize=address,undefined"

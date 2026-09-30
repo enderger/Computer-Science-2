@@ -14,6 +14,7 @@
 #
 
 mod assignments
+mod lib
 mod projects
 
 default:

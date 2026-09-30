@@ -12,18 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Generated from template
  */
-#include <print>
 
-#include "include/week3-problem1.hpp"
+#include "cs2lib/hash.hpp"
+using namespace cs2_lib::literals;
 
-using namespace std::string_view_literals;
+#include <doctest/doctest.h>
 
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+TEST_CASE("testing K&R hash") {
+    CHECK(cs2_lib::knr_hash("FoO bAr BaZ") == 82806527239459962);
+    CHECK("FoO bAr BaZ"_knr_hash == 82806527239459962);
 }

@@ -1,7 +1,8 @@
 {
   "folders": [
     { "name": "root", "path": "." },
-    { "name": "assignments", "path": "assignments" }
+    { "name": "assignments", "path": "assignments" },
+    { "name": "lib", "path": "lib" }
   ],
   "settings": {
     "update.mode": "none",

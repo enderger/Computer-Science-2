@@ -15,15 +15,21 @@
  *
  * Generated from template
  */
-#include <print>
+#include <concepts>
+#include <string>
+#include <string_view>
 
-#include "include/week3-problem1.hpp"
+#ifndef HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME2
+#define HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME2
 
-using namespace std::string_view_literals;
-
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+namespace hutzdog_cs2_week6 {
+template <std::unsigned_integral T>
+constexpr auto sum_of_digits(T n, T base = 10) -> T { // NOLINT
+    if (n < base) {
+        return n;
+    }
+    return (n % base) + sum_of_digits(n / base);
 }
+} // namespace hutzdog_cs2_week6
+
+#endif // HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME2

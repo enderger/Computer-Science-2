@@ -15,15 +15,29 @@
  *
  * Generated from template
  */
-#include <print>
 
-#include "include/week3-problem1.hpp"
+#ifndef HUTZDOG_CS2_LIB_HASH
+#define HUTZDOG_CS2_LIB_HASH
 
-using namespace std::string_view_literals;
+#include <algorithm>
+#include <cstdint>
+#include <string_view>
 
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+namespace cs2_lib {
+constexpr auto knr_hash(const std::string_view data) -> std::uint64_t {
+    return std::ranges::fold_left(
+        data, 0, [](std::uint64_t acc, char character) -> uint64_t {
+            return character + (acc << 5);
+        });
 }
+
+namespace literals {
+constexpr auto operator""_knr_hash(const char *data, uintptr_t len)
+    -> uint64_t {
+    return cs2_lib::knr_hash(std::string_view(data, len));
+}
+} // namespace literals
+
+} // namespace cs2_lib
+
+#endif // HUTZDOG_CS2_LIB_HASH

@@ -12,18 +12,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Generated from template
  */
-#include <print>
+#include "cs2lib/util.hpp"
 
-#include "include/week3-problem1.hpp"
+#ifndef HUTZDOG_CS2_LIB_DOCTEST
+#define HUTZDOG_CS2_LIB_DOCTEST
+#include <doctest/doctest.h>
+#endif // HUTZDOG_CS2_LIB_DOCTEST
 
-using namespace std::string_view_literals;
-
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+TEST_CASE("power function") {
+    CHECK(cs2_lib::util::pow(std::uint64_t{2}, std::uint8_t{0}) == 1);
+    CHECK(cs2_lib::util::pow(std::uint64_t{2}, std::uint8_t{1}) == 2);
+    CHECK(cs2_lib::util::pow(std::uint64_t{2}, std::uint8_t{4}) == 16);
+    CHECK(cs2_lib::util::pow(std::uint64_t{10}, std::uint8_t{3}) == 1000);
 }

@@ -15,15 +15,21 @@
  *
  * Generated from template
  */
-#include <print>
+#include <string>
+#include <string_view>
 
-#include "include/week3-problem1.hpp"
+#ifndef HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME3
+#define HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME3
 
-using namespace std::string_view_literals;
+namespace hutzdog_cs2_week6 {
+// TODO: Declare functions here
+///
+/// Check if a string is a palindrome
+/// \param maybe_palindrome A view into the string containing the potential
+///   palindrome
+/// \return If the string is a palindrome
+///
+auto is_palindrome(std::string_view maybe_palindrome) -> bool;
+} // namespace hutzdog_cs2_week6
 
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
-}
+#endif // HUTZDOG_CS2_ASSIGN_WEEK6_PROBLEME3

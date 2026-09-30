@@ -17,13 +17,26 @@
  */
 #include <print>
 
-#include "include/week3-problem1.hpp"
+#include "include/week3-problem2.hpp"
 
 using namespace std::string_view_literals;
 
 // MAIN
+// TODO: Replace with your actual code
 auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+    std::println(stderr, "Week 3 Problem 2 assignment");
+
+    std::println("Vehicle demonstration:");
+
+    std::println("Volkswagen Campervan:");
+    hutzdog_cs2_week3::Vehicle campervan{"Light Blue", 20'000};
+    std::println("{}", campervan);
+
+    std::println("Panda:");
+    hutzdog_cs2_week3::Car panda{"Gray", 5'000, 4};
+    panda.printInfo();
+
+    std::println("Ford F150");
+    hutzdog_cs2_week3::Truck f150{"Hot Pink (Custom)", 25'000, 3'325};
+    f150.printInfo();
 }

@@ -17,13 +17,22 @@
  */
 #include <print>
 
-#include "include/week3-problem1.hpp"
+#include "include/week6-problemE2.hpp"
 
 using namespace std::string_view_literals;
 
 // MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+// TODO: Replace with your actual code
+auto main(int argc, const char *argv[]) -> int {
+    std::println(stderr, "Week 6 Problem E2 assignment");
+    switch (argc) {
+    case 2:
+        std::println("{}",
+                     hutzdog_cs2_week6::sum_of_digits(std::stoul(argv[1])));
+        return 0;
+
+    default:
+        std::println(stderr, "Invalid usage. Usage: {} <N>", argv[0]);
+        return 1;
+    }
 }

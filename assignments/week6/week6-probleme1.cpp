@@ -15,15 +15,25 @@
  *
  * Generated from template
  */
-#include <print>
+#include <format>
+#include <string>
+#include <string_view>
 
-#include "include/week3-problem1.hpp"
+#include <doctest/doctest.h>
+
+#include "include/week6-probleme1.hpp"
 
 using namespace std::string_view_literals;
 
-// MAIN
-auto main() -> int {
-    std::println(stderr, "Week 3 Problem 1 assignment");
-    std::println(stderr, "This assignment does not have an associated runner, "
-                         "run `just assignments test` to run the test suite.");
+// IMPLEMENTATION
+
+// TESTS
+// TODO: Implement the tests here
+TEST_CASE("testing the factorial function") {
+    CHECK(hutzdog_cs2_week6::factorial(0U) == 1);
+    CHECK(hutzdog_cs2_week6::factorial(1U) == 1);
+    CHECK(hutzdog_cs2_week6::factorial(2U) == 2);
+    CHECK(hutzdog_cs2_week6::factorial(3U) == 6);
+    CHECK(hutzdog_cs2_week6::factorial(4U) == 24);
+    CHECK(hutzdog_cs2_week6::factorial(5U) == 120);
 }
