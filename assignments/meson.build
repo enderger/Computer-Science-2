@@ -21,5 +21,5 @@ project(
 
 subdir('week1')
 subdir('week3')
-
 subdir('week6')
+subdir('week7')
