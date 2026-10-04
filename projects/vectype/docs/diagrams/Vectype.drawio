@@ -1,6 +1,6 @@
 <mxfile host="Electron" pages="2">
   <diagram name="Full Diagram" id="lx7v-Pw6hcbanZI6vCwH">
-    <mxGraphModel dx="1621" dy="666" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="2133" dy="679" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -65,16 +65,16 @@
           <mxGeometry height="314" width="420" x="890" y="200" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-29" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="List&amp;lt;T&amp;gt;" vertex="1">
-          <mxGeometry height="267" width="230" x="900" y="242" as="geometry" />
+          <mxGeometry height="239" width="230" x="900" y="242" as="geometry" />
         </mxCell>
-        <mxCell id="puyhqDHGPl-XcOoA--wV-30" parent="puyhqDHGPl-XcOoA--wV-29" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;- head: unique_ptr&amp;lt;_impl::Node&amp;lt;T&amp;gt;&amp;gt;&lt;/div&gt;&lt;div&gt;- last: _impl::Node&amp;lt;T&amp;gt;* // non-owning; O(1) emplace_back&lt;/div&gt;" vertex="1">
-          <mxGeometry height="52" width="230" y="26" as="geometry" />
+        <mxCell id="puyhqDHGPl-XcOoA--wV-30" parent="puyhqDHGPl-XcOoA--wV-29" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;- head: unique_ptr&amp;lt;_impl::Node&amp;lt;T&amp;gt;&amp;gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="24" width="230" y="26" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-31" parent="puyhqDHGPl-XcOoA--wV-29" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;" value="" vertex="1">
-          <mxGeometry height="8" width="230" y="78" as="geometry" />
+          <mxGeometry height="8" width="230" y="50" as="geometry" />
         </mxCell>
-        <mxCell id="puyhqDHGPl-XcOoA--wV-32" parent="puyhqDHGPl-XcOoA--wV-29" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;+ List(const List&amp;lt;T&amp;gt;&amp;amp;) // + operator=&lt;/div&gt;&lt;div&gt;+ List(List&amp;lt;T&amp;gt;&amp;amp;&amp;amp;) // + operator=&lt;/div&gt;&lt;div&gt;+ ~List()&lt;/div&gt;&lt;div&gt;+ emplace_front(args...)&lt;/div&gt;&lt;div&gt;+ emplace_back(args...)&lt;/div&gt;&lt;div&gt;+ push_front(args...)&lt;/div&gt;&lt;div&gt;+ pop_front(): T&lt;/div&gt;&lt;div&gt;+ head(): T&amp;amp; // ALIAS: car&lt;/div&gt;&lt;div&gt;+ tail(): subrange // ALIAS: cdr; non-owning&lt;/div&gt;&lt;div&gt;+ begin(): iterator&amp;lt;T&amp;gt;&lt;/div&gt;&lt;div&gt;+ end(): default_sentinel_t&lt;/div&gt;" vertex="1">
-          <mxGeometry height="181" width="230" y="86" as="geometry" />
+        <mxCell id="puyhqDHGPl-XcOoA--wV-32" parent="puyhqDHGPl-XcOoA--wV-29" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;+ List(const List&amp;lt;T&amp;gt;&amp;amp;) // + operator=&lt;/div&gt;&lt;div&gt;+ List(List&amp;lt;T&amp;gt;&amp;amp;&amp;amp;) // + operator=&lt;/div&gt;&lt;div&gt;+ ~List()&lt;/div&gt;&lt;div&gt;+ emplace_front(args...)&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;+ push_front(args...)&lt;/span&gt;&lt;/div&gt;&lt;div&gt;+ pop_front(): T&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;+ reverse()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;+ head(): T&amp;amp; // ALIAS: car&lt;/div&gt;&lt;div&gt;+ tail(): subrange // ALIAS: cdr; non-owning&lt;/div&gt;&lt;div&gt;+ begin(): iterator&amp;lt;T&amp;gt;&lt;/div&gt;&lt;div&gt;+ end(): default_sentinel_t&lt;/div&gt;" vertex="1">
+          <mxGeometry height="181" width="230" y="58" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-50" parent="1" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=none;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Datum" vertex="1">
           <mxGeometry height="80" width="240" x="620" y="380" as="geometry" />
@@ -480,16 +480,16 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-248" parent="1" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" value="Module" vertex="1">
-          <mxGeometry height="155" width="200" x="-240" y="705" as="geometry" />
+          <mxGeometry height="134" width="200" x="-240" y="705" as="geometry" />
         </mxCell>
-        <mxCell id="puyhqDHGPl-XcOoA--wV-249" parent="puyhqDHGPl-XcOoA--wV-248" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;+ path: string&lt;/div&gt;&lt;div&gt;+ ast: AST&lt;/div&gt;&lt;div&gt;+ imports: ImportTable&lt;/div&gt;&lt;div&gt;+ scopes: List&amp;lt;Scope&amp;gt; // first is the top level; list nodes never move, so Scope* stays valid&lt;/div&gt;" vertex="1">
-          <mxGeometry height="95" width="200" y="26" as="geometry" />
+        <mxCell id="puyhqDHGPl-XcOoA--wV-249" parent="puyhqDHGPl-XcOoA--wV-248" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;+ path: string&lt;/div&gt;&lt;div&gt;+ ast: AST&lt;/div&gt;&lt;div&gt;+ imports: ImportTable&lt;/div&gt;&lt;div&gt;+ scopes: List&amp;lt;Scope&amp;gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="74" width="200" y="26" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-250" parent="puyhqDHGPl-XcOoA--wV-248" style="line;strokeWidth=1;fillColor=none;align=left;verticalAlign=middle;spacingTop=-1;spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];portConstraint=eastwest;strokeColor=inherit;" value="" vertex="1">
-          <mxGeometry height="8" width="200" y="121" as="geometry" />
+          <mxGeometry height="8" width="200" y="100" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-251" parent="puyhqDHGPl-XcOoA--wV-248" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;whiteSpace=wrap;html=1;" value="&lt;div&gt;+ top_level(): Scope&amp;amp;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="26" width="200" y="129" as="geometry" />
+          <mxGeometry height="26" width="200" y="108" as="geometry" />
         </mxCell>
         <mxCell id="puyhqDHGPl-XcOoA--wV-256" edge="1" parent="1" source="puyhqDHGPl-XcOoA--wV-283" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="puyhqDHGPl-XcOoA--wV-248">
           <mxGeometry relative="1" as="geometry">
