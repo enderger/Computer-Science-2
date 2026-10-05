@@ -1,5 +1,5 @@
 ---
-title: "CS2 Process Log"
+title: "CS2 M1 Process Log"
 author: Danielle Hutzley
 ---
 
