@@ -16,12 +16,12 @@ The pipeline of this compiler is as follows:
 2. Per file:
     1. Lexer: Range adaptor, turns source text into tokens which borrow the source text.
     2. Reader: Parses the tokens into a cons list of `Datum`s using a parse stack
-    3. Analyzer: Translates the `Datums` into an `AST` of polymorphic typed atoms (behind `unique_ptr`) using the visitor pattern
+    3. Analyzer: Translates the `Datums` into an `AST` of polymorphic typed atoms (behind `unique_ptr`), providing a visitor pattern interface
         - This also interns every symbol into `SymbolRefs` via the `Interner`
 3. Module Resolver: Starting from the entry file, loads each imported file through the "per file" stages and builds the module graph
     - A DFS produces the compile order and rejects import cycles
     - Each module's import table is frozen: quicksorted, then check for duplicates
-4. Per module, in compoile order:
+4. Per module, in compile order:
     1. Name Resolver: Fills the module's scope field: one BST of bindings per scope.
         - Any non-local symbol is binary searched in the import table
     2. Linear Type Checker: Provides memory safety guarantees without a complicated garbage collector or borrow checker
@@ -40,7 +40,7 @@ The `Lexer` and `Reader` live in `cs2_lib`; they can be reused as a data format 
 A full version of this diagram can be found [here](#appendix-1)
 
 ## Category Mapping
-#### Containers / Generic Programming
+#### 1. Containers / Generic Programming
 ##### Templates
 - Examples: `List<T>`, `ConsList<T>`, `Bst<K, V>`, `Map<K, V, H>`, `Graph<T>`
 - These all gain flexibility from being templates; `List` for instance works as an AST, a parse stack, `Map`'s bucket, etc.
@@ -56,10 +56,10 @@ A full version of this diagram can be found [here](#appendix-1)
     + Writing all the atom types into a type alias would become unwieldy
     + `Atom`s have a common interface that polymorphism (both regular and CRTP) can use to avoid code duplication.
 
-#### Resource Management
+#### 2. Resource Management
 ##### Rule of Five
 - `List<T>` is an example of the Rule of Five; it has a copy constructor/assignment operator, a move constructor/assignment operator, and a destructor.
-- This is because a recursive destructor could easily overflow the stack (~59k nodes at `O0`, ~3.6k on a 512KiB thread), making custom iterative destruction the only solution.
+- This is because a recursive destructor could easily overflow the stack (~59k nodes at `O0`, ~3.6k on a 512KiB thread), making a handwritten solution valuable.
     + This destructor means that the Rule of Five applies, since move semantics are desirable.
     + The Rule of Five is a strict superset of the Rule of Three, so it applies here.
 
@@ -67,7 +67,7 @@ A full version of this diagram can be found [here](#appendix-1)
 - `Atom` and `VisitorBase` have virtual destructors; their children both might have data that needs destruction.
 - Everything built from these follow the Rule of Zero (`Module`, `Scope`, `ImportTable`, children of `Atom`, etc).
 
-#### Linked Structure
+#### 3. Linked Structure
 - `List<T>` is a singly linked list with only a `unique_ptr<Node<T>>` as its head
 - Its member functions are:
     + `emplace_front` : Construct a node in place on the front of the list.
@@ -80,13 +80,13 @@ A full version of this diagram can be found [here](#appendix-1)
 - S-expressions are fundamentally cons lists, making most structures based on them representable by a pair of a linked list and a CDR pointer
 - I also use `List<T>` buckets in `Map<K, V, H>`
 
-#### Stacks/Queues
+#### 4. Stacks/Queues
 - `List<T>` is used as a stack (via `emplace_front`, `push_front`, `head`, and `pop_front`) in the `Reader`'s `parseStack`.
     + An open list is pushed at `(`, children are `emplace_front`ed onto it, and `)` pops the list, reverses it, and adds it to the parent.
-- A stack is used as nesting of S-expressions is inherently last-in, first-out and recursion is bounded by the stack.
+- It is an explicit stack rather than recursion because recursion is bounded by the call stack, while this is bounded by the heap.
 - I'm using `List<T>` here because I understand how it works better
 
-#### Hash Table
+#### 5. Hash Table
 - `Map<K, V, H = std::hash<K>>` (where `H: func(const K&) -> size_t` and `K: std::equality_comparable`).
 - Storage is a `std::vector<List<std::pair<const K, V>>>`
 - Member functions:
@@ -102,26 +102,30 @@ A full version of this diagram can be found [here](#appendix-1)
 - `import-ffi` table, `Map<SymbolRef, FfiSignature>` keyed by a quoted JS path
 
 ##### Implementation:
-Fnv1a works by multiplying a base (in our case `14695981039346656037`), then XORing in each byte and multiplying it by a multiplier (in our case `1099511628211`).
+`Fnv1a` (64-bit) starts from an offset basis (in our case `14695981039346656037`), then for each byte XORs it in and multiplies by a prime (in our case `1099511628211`).
 
 We aren't using K&R because a multiplier of `31` gives structural hash collisions
 
-#### Trees 
+#### 6. Trees 
 - `Bst<K: totally_ordered, V>`, with `insert(K, V) → pair<V&, bool>`, `find(const K&) → V*`, `in_order(visitor)`, `size()` and `height()`. There's no deletion: scopes only grow.
 - A BST is used as I insert one at a time during resolution. The import table is sorted once and thus gets regular binary search on a sorted list.
 - In the worst case, insertion is in sorted order leading to a linked list with O(N) lookup.
 
 ##### Uses
-- `Scope { table: Bst<SymbolRef, Binding>; parent: Scope* }`. `lookup` walks the parent chain. The traversal's real use is the symbol dump. The `SymbolRef` is an incrementing counter multiplied by the odd 64-bit constant `0x9E3779B97F4A7C15` to avoid the worst case (plain incrementing integers being in linked list order)
+- `Scope { table: Bst<SymbolRef, Binding>; parent: Scope* }`. `lookup` walks the parent chain. The traversal's real use is the symbol dump.
+- The tree is keyed by the `SymbolRef` multiplied by the odd 64-bit constant `0x9E3779B97F4A7C15` (Fibonacci hashing) to avoid the worst case.
+    + Multiplying by an odd number can be undone, so two symbols never share a key, and `SymbolRef` itself stays a plain counter (so the `Interner`'s reverse lookup still works).
+    + Measured with 10,000 symbols: height 10,000 unscrambled, 19 scrambled (the best possible is ~13.3).
+    + The trade-off is that in-order is no longer alphabetical, so the symbol dump is sorted by name first.
 
-#### Graphs
+#### 7. Graphs
 - `Graph<T>` holds adjacency lists (`std::vector<std::vector<NodeIdx>>`) and node data.
 - Its members are `add_node`, `add_edge`, `get`, `successors`, `topological_order` (a three-state DFS) and `to_dot`.
 - Used as `ModuleGraph = Graph<Module>` where edge `a -> b` means `a` imports `b`
-- Imports are directed (they are asymmetric and cycles mean a program is ill formed) and unewighted (as there is no cost to importing).
-- We compile in DFS order
+- Imports are directed (they are asymmetric and cycles mean a program is ill formed) and unweighted (as there is no cost to importing).
+- We compile in DFS post order
 
-#### Search / Sort
+#### 8. Search / Sort
 - `cs2_lib::algorithm` provides `quicksort(std::span<T>, Compare)`, with a median-of-three pivot, and `binary_search(std::span<const T>, const K&, Compare) → const T*`, a lower-bound search.
 - Median of 3 is used as the `SymbolRefs` arrive mostly sorted. Since the table can be frozen (and thus only sorted once), a BST that's slower but retains sort order is a poor trade-off.
 
@@ -130,10 +134,10 @@ We aren't using K&R because a multiplier of `31` gives structural hash collision
 
 ##### Time Complexity
 
-| Algorithm     | Complexity | Average Complexity | 
-|---------------|------------|-------------|
-| quicksort     | O(n^2)     | O(n log n)  |
-| binary_search | O(log n)   | O(log n)    |
+| Algorithm     | Worst Case | Average Case | 
+|---------------|------------|--------------|
+| quicksort     | O(n^2)     | O(n log n)   |
+| binary_search | O(log n)   | O(log n)     |
 
 <!-- BEGIN AI WRITTEN SECTION -->
 ## Milestone Plan
