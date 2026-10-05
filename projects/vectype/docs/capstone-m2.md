@@ -171,4 +171,4 @@ This QR code will take you to the full version of my class diagram, frozen in ti
 This is a render of the diagram at `./diagrams/Vectype.drawio`.
 
 ![](images/full-diagram-qr.png){width=1.2in}
-Full diagram: <https://viewer.diagrams.net/?nav=1#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fenderger%2FComputer-Science-2%2F4838ac879e808adfe857fc48bd07f3132dc97fa8%2Fprojects%2Fvectype%2Fdocs%2Fdiagrams%2FVectype.drawio#%7B%22pageId%22%3A%22lx7v-Pw6hcbanZI6vCwH%22%7D>
+Full diagram: <https://viewer.diagrams.net/?nav=1#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fenderger%2FComputer-Science-2%2Fab5651089fa006a489cdc35a95e077d44318e74e%2Fprojects%2Fvectype%2Fdocs%2Fdiagrams%2FVectype.drawio#%7B%22pageId%22%3A%22lx7v-Pw6hcbanZI6vCwH%22%7D>
