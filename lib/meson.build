@@ -22,6 +22,23 @@ project(
     license: 'Apache-2.0',
 )
 
+if not meson.is_subproject()
+    # We support MSVC via pragmas
+    if meson.get_compiler('cpp').get_id() == 'clang'
+        add_global_arguments(
+            '-Wno-unknown-pragmas',
+            '-Wno-unknown-attributes',
+            language: 'cpp',
+        )
+    elif meson.get_compiler('cpp').get_id() == 'gcc'
+        add_global_arguments(
+            '-Wno-unknown-pragmas',
+            '-Wno-unknown-attributes',
+            language: 'cpp',
+        )
+    endif
+endif
+
 cpptrace_dep = dependency('cpptrace')
 doctest_dep = dependency('doctest')
 
@@ -43,6 +60,8 @@ cs2_lib = static_library(
 )
 install_headers(
     'include/cs2lib/hash.hpp',
+    # Spoiler for my next branch
+    #    'include/cs2lib/list.hpp',
     'include/cs2lib/sexp.hpp',
     'include/cs2lib/util.hpp',
     subdir: 'cs2lib',

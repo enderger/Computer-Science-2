@@ -19,7 +19,23 @@ project(
     default_options: ['cpp_std=c++23', 'warning_level=3', 'werror=true'],
 )
 
+# We support MSVC via pragmas
+if meson.get_compiler('cpp').get_id() == 'clang'
+    add_global_arguments(
+        '-Wno-unknown-pragmas',
+        '-Wno-unknown-attributes',
+        language: 'cpp',
+    )
+elif meson.get_compiler('cpp').get_id() == 'gcc'
+    add_global_arguments(
+        '-Wno-unknown-pragmas',
+        '-Wno-unknown-attributes',
+        language: 'cpp',
+    )
+endif
+
 subdir('week1')
 subdir('week3')
 subdir('week6')
 subdir('week7')
+subdir('week8')

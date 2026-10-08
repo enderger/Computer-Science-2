@@ -17,7 +17,7 @@ configure mode='debug':
     case '{{ mode }}' in \
         "debug") export FLAGS="-Db_sanitize=address,undefined --optimization=0 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "thread-debug") export FLAGS="-Db_sanitize=thread,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
-        "optimized-debug") export FLAGS="-Db_sanitize=address,undefined --optimization=1 -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
+        "optimized-debug") export FLAGS="-Db_sanitize=address,undefined --optimization=g -Db_lundef=false -Dcpp_args=-fno-sanitize-recover=undefined";; \
         "release") export FLAGS="--buildtype=release";; \
         "release-sanitized") export FLAGS="--buildtype=release --optimization=3 -Db_sanitize=undefined";; \
         *) echo >&2 "Error: Please select a build type of 'debug', 'optimized-debug', 'thread-debug', 'release', or 'release-sanitized'"; exit 1;; \
