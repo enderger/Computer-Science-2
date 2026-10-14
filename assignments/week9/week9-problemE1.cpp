@@ -29,7 +29,12 @@ using namespace std::string_view_literals;
 
 // TESTS
 TEST_CASE("testing the Queue class") {
-    struct Point { int x, y; Point() = default; Point(int x, int y) : x{x}, y{y} {}; auto operator==(const Point &other) const -> bool = default; }; // NOLINT
+    struct Point {
+        int x, y;
+        Point() = default;
+        Point(int x, int y) : x{x}, y{y} {};
+        auto operator==(const Point &other) const -> bool = default;
+    }; // NOLINT
     hutzdog_cs2_week9::Queue<Point> queue{};
     queue.enqueue(Point{1, 1});
     queue.emplace(2, 2);

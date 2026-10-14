@@ -24,8 +24,7 @@
 #include <optional>
 
 namespace hutzdog_cs2_week9 {
-template <std::move_constructible T>
-class Queue {
+template <std::move_constructible T> class Queue {
   public:
     constexpr Queue() = default;
 
@@ -39,19 +38,22 @@ class Queue {
         this->tail->next = std::make_unique<Node>(std::forward<T>(value));
         this->tail = this->tail->next.get();
     }
-    constexpr void enqueue(const T &value) requires std::copy_constructible<T> {
+    constexpr void enqueue(const T &value)
+        requires std::copy_constructible<T>
+    {
         this->enqueue(std::move(T{value}));
     }
 
-    template <class... Args>
-    constexpr void emplace(Args&&... values) {
+    template <class... Args> constexpr void emplace(Args &&...values) {
         if (this->is_empty()) {
-            this->head = std::make_unique<Node>(std::move(T(std::forward<Args>(values)...)));
+            this->head = std::make_unique<Node>(
+                std::move(T(std::forward<Args>(values)...)));
             this->tail = this->head.get();
             return;
         }
 
-        this->tail->next = std::make_unique<Node>(std::move(T(std::forward<Args>(values)...)));
+        this->tail->next =
+            std::make_unique<Node>(std::move(T(std::forward<Args>(values)...)));
         this->tail = this->tail->next.get();
     }
 
@@ -76,12 +78,10 @@ class Queue {
 
   private:
     struct Node {
-        T data; // NOLINT
+        T data;                              // NOLINT
         std::unique_ptr<Node> next{nullptr}; // NOLINT
 
-        constexpr Node(T &&data) {
-            this->data = data;
-        }
+        constexpr Node(T &&data) { this->data = data; }
     };
     std::unique_ptr<Node> head{nullptr};
     Node *tail = head.get();
@@ -91,12 +91,15 @@ class Queue {
 } // namespace hutzdog_cs2_week9
 
 template <class T>
-requires std::formattable<T, char>
-struct std::formatter<hutzdog_cs2_week9::Queue<T>> : std::formatter<std::string> {
+    requires std::formattable<T, char>
+struct std::formatter<hutzdog_cs2_week9::Queue<T>>
+    : std::formatter<std::string> {
     template <class FormatCtx>
-    auto format(const hutzdog_cs2_week9::Queue<T> &queue, FormatCtx &ctx) const {
+    auto format(const hutzdog_cs2_week9::Queue<T> &queue,
+                FormatCtx &ctx) const {
         std::string res{"(List"};
-        for (auto ptr = queue.head.get(); ptr != nullptr; ptr = ptr->next.get()) {
+        for (auto ptr = queue.head.get(); ptr != nullptr;
+             ptr = ptr->next.get()) {
             std::format_to(res, " `{}`", ptr->data);
         }
         res += ")";
