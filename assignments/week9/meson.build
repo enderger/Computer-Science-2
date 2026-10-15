@@ -40,3 +40,25 @@ executable(
     install: true,
 )
 
+test(
+    'week9-problemE2',
+    executable(
+        'week9-problemE2-tests',
+        'week9-problemE2.cpp',
+        cpp_args: ['-DDOCTEST_CONFIG_IMPLEMENT_WITH_MAIN'],
+        dependencies: [doctest_dep, cs2_lib_dep],
+        include_directories: incdir,
+    ),
+    suite: 'basic',
+)
+
+executable(
+    'week9-problemE2',
+    'week9-problemE2.cpp',
+    'week9-problemE2-runner.cpp',
+    cpp_args: ['-DDOCTEST_CONFIG_DISABLE'],
+    dependencies: [doctest_dep, cs2_lib_dep],
+    include_directories: incdir,
+    install: true,
+)
+
