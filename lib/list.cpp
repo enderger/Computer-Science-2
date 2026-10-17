@@ -29,6 +29,8 @@
 #include <optional>
 #include <ranges>
 
+using namespace std::string_view_literals;
+
 [[maybe_unused]] constexpr const std::size_t RECURSIVE_TEST_SIZE = 4'000'000U;
 
 namespace {
@@ -48,6 +50,7 @@ struct Element {
 
 TEST_SUITE("test the list") {
     using cs2_lib::list::List;
+    using namespace cs2_lib;
 
     TEST_CASE("list length") {
         // NOLINTNEXTLINE(readability-magic-numbers)
@@ -88,6 +91,19 @@ TEST_SUITE("test the list") {
         cs2_lib::list::List big_list(RECURSIVE_TEST_SIZE, 0);
         CHECK(RECURSIVE_TEST_SIZE == big_list.length());
         // )
+    }
+
+    TEST_CASE("list equality") {
+        REQUIRE(List<std::monostate>{} == List<std::monostate>{});
+        REQUIRE(List{1, 2, 3} == List{1, 2, 3});
+        REQUIRE(List{1, 2, 3} != List{1, 2});
+        REQUIRE(List{1, 2, 3} != List{1, 2, 4});
+
+        REQUIRE(std::ranges::equal(List{1, 2, 3}, List{1, 2, 3}));
+        REQUIRE_MESSAGE(
+            std::ranges::equal(List{1, 2, 3}.cdr(), List{2, 3}),
+            "Actual list: ", util::RangeFormatter(List{1, 2, 3}.cdr()));
+        REQUIRE(!std::ranges::equal(List{1, 2, 3}, List{1, 2, 4}));
     }
 
     TEST_CASE("list push/emplace/pop") {
@@ -155,18 +171,167 @@ TEST_SUITE("test the list") {
     TEST_CASE("list car/cdr/cndr/index") {
         List test_list{0, 1, 2, 3, 4};
 
-        CHECK(0 == test_list.car());
-        CHECK(1 == test_list[1]);
-        CHECK(1 == *test_list.cdr().begin());
-        CHECK(3 == *test_list.cndr(3).begin());
+        SUBCASE("out of range") {
+            REQUIRE_THROWS_AS([&] { (void)test_list[test_list.length()]; }(),
+                              std::out_of_range);
 
-        const List test_const_list{test_list}; // NOLINT
-        CHECK(0 == test_const_list.car());
-        CHECK(1 == test_const_list[1]);
-        CHECK(1 == *test_const_list.cdr().begin());
-        CHECK(3 == *test_const_list.cndr(3).begin());
+            REQUIRE(test_list.cndr(test_list.length()).begin() ==
+                    std::default_sentinel);
 
-        List<int> test_empty_list{};
-        CHECK(std::nullopt == test_empty_list.car());
+            REQUIRE_THROWS_AS([&] { (void)test_list[-1]; }(),
+                              std::out_of_range);
+
+            REQUIRE_THROWS_AS([&] { (void)test_list.cndr(-1).begin(); }(),
+                              std::out_of_range);
+
+            REQUIRE_THROWS_AS([&] { test_list[-1] = -1; }(), std::out_of_range);
+        }
+
+        SUBCASE("non const list") {
+            CHECK(0 == test_list.car());
+            CHECK(1 == test_list[1]);
+            CHECK_MESSAGE(
+                std::ranges::equal(List{1, 2, 3, 4}, test_list.cdr()),
+                "Actual list: ", util::RangeFormatter(test_list.cdr()));
+
+            CHECK_MESSAGE(
+                std::ranges::equal(List{3, 4}, test_list.cndr(3)),
+                "Actual list: ", util::RangeFormatter(test_list.cndr(3)));
+        }
+
+        SUBCASE("list entry assignment") {
+            test_list[4] = 3;
+            CHECK(3 == test_list[4]);
+        }
+
+        SUBCASE("const list") {
+            [[maybe_unused]] const List<int> &test_const_list = test_list;
+            static_assert(std::same_as<cs2_lib::list::Iterator<int, true>,
+                                       decltype(test_const_list.begin())>);
+            CHECK(0 == test_const_list.car());
+            CHECK(1 == test_const_list[1]);
+            CHECK_MESSAGE(
+                std::ranges::equal(List{1, 2, 3, 4}, test_const_list.cdr()),
+                "Actual list: ", util::RangeFormatter(test_const_list.cdr()));
+
+            CHECK_MESSAGE(
+                std::ranges::equal(List{3, 4}, test_const_list.cndr(3)),
+                "Actual list: ", util::RangeFormatter(test_const_list.cndr(3)));
+        }
+
+        SUBCASE("empty/one element list") {
+            List<int> test_empty_list{};
+            List test_single_element_list{std::monostate{}};
+            CHECK(std::nullopt == test_empty_list.car());
+            CHECK(test_empty_list.empty());
+
+            CHECK(std::default_sentinel == test_empty_list.cdr().begin());
+            CHECK(std::default_sentinel == test_empty_list.cndr(1).begin());
+            CHECK(std::default_sentinel ==
+                  test_single_element_list.cndr(1).begin());
+        }
+    }
+
+    TEST_CASE("list copies") {
+        List<std::string> base{"zero", "one", "two"};
+        List copy{base};
+
+        SUBCASE("alias copy") {
+            auto &alias = copy;
+            copy = alias;
+            CHECK(base == copy);
+        }
+
+        SUBCASE("copy mutation") {
+            SUBCASE("value mutation") {
+                copy[0][0] = 'Z';
+                CHECK(base[0] == "zero"sv);
+                CHECK(copy[0] == "Zero"sv);
+            }
+
+            SUBCASE("value replacement") {
+                copy[0] = "nil";
+                CHECK(base[0] == "zero"sv);
+                CHECK(copy[0] == "nil"sv);
+            }
+        }
+
+        SUBCASE("copy assignment") {
+            base.emplace_front("negative one"sv);
+            copy = base;
+            CHECK(base == copy);
+        }
+    }
+
+    TEST_CASE("list moves") {
+        List values{0, 1, 2, 3, 4};
+        List moved{std::move(values)};
+
+        CHECK(values.empty());
+
+        values = List{4, 3, 2, 1, 0};
+        CHECK(List{4, 3, 2, 1, 0} == values);
+    }
+
+    TEST_CASE("big lists") {
+        List values(RECURSIVE_TEST_SIZE, 1);
+
+        SUBCASE("recursion limits") {
+            SUBCASE("copy constructor/assignment") {
+                // CHECK_OVERFLOW(
+                [[maybe_unused]] List copy_constructed{values}; // NOLINT
+                List<int> copy_assigned{};
+                copy_assigned = values;
+                // )
+            }
+
+            SUBCASE("copy overwrite") {
+                // CHECK_OVERFLOW(
+                List new_val{0};
+                values = new_val;
+                // )
+            }
+
+            SUBCASE("move constructor/assignment") {
+                // CHECK_OVERFLOW(
+                [[maybe_unused]] List move_constructed{
+                    std::move(values)}; // NOLINT
+                List<int> move_assigned{};
+                move_assigned = std::move(move_constructed);
+                // )
+            }
+
+            SUBCASE("move overwrite") {
+                // CHECK_OVERFLOW(
+                List new_val{0};
+                values = std::move(new_val);
+                // )
+            }
+
+            SUBCASE("reverse") {
+                // CHECK_OVERFLOW
+                values.reverse();
+                // )
+            }
+
+            SUBCASE("equality") {
+                // CHECK_OVERFLOW
+                List copy{values}; // NOLINT
+                CHECK(values == copy);
+
+                List other(RECURSIVE_TEST_SIZE, 1);
+                other[RECURSIVE_TEST_SIZE - 1] = 0;
+                CHECK(other != values);
+                // )
+            }
+
+            SUBCASE("pop everything") {
+                // CHECK_OVERFLOW
+                while (!values.empty()) {
+                    (void)values.pop_front();
+                }
+                // )
+            }
+        }
     }
 }

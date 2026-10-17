@@ -43,7 +43,7 @@ cpptrace_dep = dependency('cpptrace')
 doctest_dep = dependency('doctest')
 
 inc_dir = include_directories('include')
-src = ['hash.cpp', 'list.cpp', 'sexp.cpp', 'util.cpp']
+src = ['hash.cpp', 'list.cpp', 'list_extra.cpp', 'sexp.cpp', 'util.cpp']
 
 if get_option('buildtype') != 'release'
     add_project_arguments('-DCS2LIB_DEBUG', language: 'cpp')

@@ -158,7 +158,7 @@ template <class T> class List {
         this->reverse();
     }
 
-    constexpr List(List &&other) = default;
+    constexpr List(List &&other) noexcept = default;
 
     constexpr auto operator=(List &&other) noexcept -> List & {
         this->head.swap(other.head);
@@ -277,34 +277,16 @@ template <class T> class List {
     ///
     /// O(n) index operation, this is the best you can get on a linked list
     ///
-    [[nodiscard]] constexpr auto operator[](std::size_t idx) const
-        -> const T & {
+    template <class Self>
+    [[nodiscard]] constexpr auto operator[](this Self &self, std::size_t idx)
+        -> std::conditional_t<std::is_const_v<Self>, const T &, T &> {
         if (!std::in_range<std::ptrdiff_t>(idx)) {
             throw std::out_of_range(
-                "Index out of range (we only accept ptrdiff range elements)");
+                "Linked list index past the size of a ptrdiff");
         }
-
-        const Iterator result =
-            std::ranges::next(this->begin(), idx, this->end());
-        if (result == this->end()) {
-            throw std::out_of_range(
-                std::format("Index out of bounds: {}", idx));
-        }
-        return *result;
-    }
-
-    ///
-    /// O(n) index operation, this is the best you can get on a linked list
-    ///
-    [[nodiscard]] constexpr auto operator[](std::size_t idx) -> T & {
-        if (!std::in_range<std::ptrdiff_t>(idx)) {
-            throw std::out_of_range(
-                "Index out of range (we only accept ptrdiff range elements)");
-        }
-
-        Iterator<T, false> result =
-            std::ranges::next(this->begin(), idx, this->end());
-        if (result == this->end()) {
+        const Iterator<T, std::is_const_v<Self>> result = std::ranges::next(
+            self.begin(), static_cast<std::ptrdiff_t>(idx), self.end());
+        if (result == self.end()) {
             throw std::out_of_range(
                 std::format("Index out of bounds: {}", idx));
         }
@@ -314,17 +296,14 @@ template <class T> class List {
     ///
     /// Helper to get the Nth cdr of a list
     ///
-    [[nodiscard]] constexpr auto cndr(std::size_t idx) const
+    template <class Self>
+    [[nodiscard]] constexpr auto cndr(this Self &self, std::size_t idx)
         -> std::ranges::view auto {
-        return *this | std::views::drop(idx);
-    }
-
-    ///
-    /// Helper to get the Nth cdr of a list
-    ///
-    [[nodiscard]] constexpr auto cndr(std::size_t idx) -> std::ranges::view
-        auto {
-        return *this | std::views::drop(idx);
+        if (!std::in_range<std::ptrdiff_t>(idx)) {
+            throw std::out_of_range(
+                "Linked list cndr past the size of a ptrdiff");
+        }
+        return self | std::views::drop(static_cast<std::ptrdiff_t>(idx));
     }
 
     ///
@@ -392,6 +371,8 @@ template <class T> class List {
     friend class Iterator<T>;
 };
 static_assert(std::ranges::viewable_range<List<int>>);
+static_assert(std::is_nothrow_move_constructible_v<List<int>>);
+static_assert(std::is_nothrow_move_assignable_v<List<int>>);
 
 template <std::ranges::input_range R>
 List(std::from_range_t, R &&) -> List<std::ranges::range_value_t<R>>;
