@@ -18,6 +18,8 @@
 #define HUTZDOG_CS2_LIB_UTIL
 
 #include <concepts>
+#include <cstddef>
+#include <format>
 
 namespace cs2_lib::util {
 
@@ -33,6 +35,15 @@ concept Exponentable = requires(T base, U exponent) {
 
     std::unsigned_integral<U>;
 };
+
+///
+/// A concept for the allocators used in this library
+///
+template <class Alloc>
+concept Allocator = requires(Alloc alloc, size_t n) {
+    { *alloc.allocate(n) } -> std::same_as<typename Alloc::value_type &>;
+    { alloc.deallocate(alloc.allocate(n), n) };
+} && std::copy_constructible<Alloc> && std::equality_comparable<Alloc>;
 
 ///
 /// Raise a base to an exponent. Why only a float version from C exists in the
@@ -51,6 +62,12 @@ template <class T, class U>
 
     return total;
 }
+
+template <class T>
+concept Printable =
+    std::formattable<T, char> || requires(std::ostream &ost, const T &val) {
+        { ost << val } -> std::convertible_to<std::ostream &>;
+    };
 
 } // namespace cs2_lib::util
 

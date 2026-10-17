@@ -72,13 +72,17 @@ A full version of this diagram can be found [here](#appendix-1)
 - Its member functions are:
     + `emplace_front` : Construct a node in place on the front of the list.
     + `push_front` : Push an existing value at the front of the list
-    + `pop_front` : Pop a value off the front and return it as an `prvalue` (or throws on the empty list)
+    + `pop_front` : Pop a value off the front and return it as an `prvalue` (or returns `std::nullopt` on an empty list)
     + `reverse` : Reverse the list in-place
     + `head` / `tail`: The `car` and `cdr` operations similar to LISP
     + `begin` / `end`: Range implementation
     + There is no back pointer; this list is singly linked
 - S-expressions are fundamentally cons lists, making most structures based on them representable by a pair of a linked list and a CDR pointer
 - I also use `List<T>` buckets in `Map<K, V, H>`
+- This structure follows the following rule for empty values:
+    1. Valid single values (e.g. push_front) return `std::optional` and `nullopt` when empty.
+    2. Valid empty ranges return an empty range
+    3. Everything else is an exception
 
 #### 4. Stacks/Queues
 - `List<T>` is used as a stack (via `emplace_front`, `push_front`, `head`, and `pop_front`) in the `Reader`'s `parseStack`.
