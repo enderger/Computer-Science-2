@@ -43,7 +43,7 @@ cpptrace_dep = dependency('cpptrace')
 doctest_dep = dependency('doctest')
 
 inc_dir = include_directories('include')
-src = ['hash.cpp', 'sexp.cpp', 'util.cpp']
+src = ['hash.cpp', 'list.cpp', 'list_extra.cpp', 'sexp.cpp', 'util.cpp']
 
 if get_option('buildtype') != 'release'
     add_project_arguments('-DCS2LIB_DEBUG', language: 'cpp')
@@ -60,8 +60,7 @@ cs2_lib = static_library(
 )
 install_headers(
     'include/cs2lib/hash.hpp',
-    # Spoiler for my next branch
-    #    'include/cs2lib/list.hpp',
+    'include/cs2lib/list.hpp',
     'include/cs2lib/sexp.hpp',
     'include/cs2lib/util.hpp',
     subdir: 'cs2lib',
