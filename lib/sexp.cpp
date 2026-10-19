@@ -1151,3 +1151,7 @@ TEST_CASE("other tests") {
         CHECK(test.expected == std::format("{:gnu}", test.span));
     }
 }
+
+TEST_CASE("test the reader") {
+    using namespace cs2_lib::sexp;
+}

@@ -17,6 +17,7 @@
 #ifndef HUTZDOG_CS2_LIB_SEXP
 #define HUTZDOG_CS2_LIB_SEXP
 
+#include "cs2lib/list.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -886,6 +887,38 @@ static_assert(std::ranges::view<decltype(std::string_view{} |
 
 } // namespace lexer
 using lexer::Lexer;
+
+namespace reader {
+class Datum;
+
+struct Atom {
+    std::string_view text;
+    Span span;
+};
+
+struct ListDatum {
+    list::List<std::unique_ptr<Datum>> items;
+};
+
+using Datum = std::variant<Atom, ListDatum>;
+
+
+
+///
+/// A basic S-expression parser
+///
+template <std::ranges::input_range R>
+    requires std::same_as<std::ranges::range_value_t<R>, lexer::Token>
+class Reader {
+  public:
+    constexpr Reader(R &&range)
+
+  private:
+    R data;
+    cs2_lib::list::List<Datum> parse_stack{};
+};
+} // namespace reader
+using reader::Reader;
 
 } // namespace cs2_lib::sexp
 
