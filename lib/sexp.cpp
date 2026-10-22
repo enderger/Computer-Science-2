@@ -43,10 +43,21 @@
 #define CS2LIB_FUZZ_THREADS 8
 #endif
 
+[[nodiscard]] auto cs2_lib::sexp::Span::join(const Span &span) && -> std::expected<Span, std::string> {
+    if (this->position_span > span.position_span ||
+        (this->position_span.begin_pos.line == span.position_span.begin_pos.line &&
+        this->position_span.begin_pos.col > span.position_span.begin_pos.col)) {
+        return std::unexpected(std::format("span {} begins before span {}",
+                                           *this, span) );
+    }
+    if (this->position_span.end_pos < )
+}
+
 static_assert(std::same_as<std::variant<std::string_view,
-                                        cs2_lib::sexp::lexer::ErrorData>,
+                                        cs2_lib::sexp::ErrorData>,
                            decltype(cs2_lib::sexp::lexer::Token::data)>,
               "Update the tests to reflect the new version of data");
+
 
 namespace {
 inline auto generate_full_alphabet() -> std::string {
@@ -79,6 +90,7 @@ inline auto generate_full_alphabet() -> std::string {
 TEST_CASE("test the lexer") {
     using namespace cs2_lib::sexp;
     lexer::Lexer lexer{cs2_lib::sexp::Settings{}};
+    const ErrorData::Factory edf{"lexer"};
 
     SUBCASE("hello world") {
         constexpr std::string_view file_name = "basic.vtyp"sv;
@@ -203,7 +215,7 @@ TEST_CASE("test the lexer") {
                 std::string_view text, std::string_view file_name,
                 lexer::TokenType tok_type, Span::Position end, uint64_t length,
                 const std::optional<std::variant<
-                    std::string_view, lexer::ErrorData>> &expected_data = {},
+                    std::string_view, ErrorData>> &expected_data = {},
                 uint64_t index = 0, Lexer lexer = {Settings{}})
                 : text{text}, file_name{file_name}, lexer{std::move(lexer)},
                   token{tok_type,
@@ -219,19 +231,19 @@ TEST_CASE("test the lexer") {
         const StCase test_case = GENERATE(
             StCase("\""sv, "unterminated_string_empty.vtyp"sv,
                    lexer::TokenType::Error, {1, 1}, 1,
-                   lexer::ErrorData{"unterminated string"}),
+                   edf.create("unterminated string")),
             StCase("\"abc"sv, "unterminated_string.vtyp"sv,
                    lexer::TokenType::Error, {1, 4}, 4,
-                   lexer::ErrorData{"unterminated string"}),
+                   edf.create("unterminated string")),
             StCase("\"abc\\"sv, "unterminated_escape.vtyp"sv,
                    lexer::TokenType::Error, {1, 5}, 5,
-                   lexer::ErrorData{"unterminated string"}),
+                   edf.create("unterminated string")),
             StCase(R"("abc\")"sv, "unterminated_quote_escape.vtyp"sv,
                    lexer::TokenType::Error, {1, 6}, 6,
-                   lexer::ErrorData{"unterminated string"}),
+                   edf.create("unterminated string")),
             StCase("`\""sv, "unterminated_alternate_quotes.vtyp"sv,
                    lexer::TokenType::Error, {1, 2}, 2,
-                   lexer::ErrorData{"unterminated string"}, 0,
+                   edf.create("unterminated string"), 0,
                    Lexer{Settings{
                        .locale = std::locale::classic(),
                        .quote_characters = {'"', '`'},
@@ -285,7 +297,7 @@ TEST_CASE("test the lexer") {
         struct SmallCase {
             struct ProtoToken {
                 lexer::TokenType type;
-                std::variant<std::string_view, lexer::ErrorData> data;
+                std::variant<std::string_view, ErrorData> data;
                 Span::PositionSpan span;
             };
 
@@ -798,7 +810,7 @@ TEST_CASE("test the lexer") {
                         },
                         {
                             .type = lexer::TokenType::Error,
-                            .data = lexer::ErrorData{"unterminated string"},
+                            .data = edf.create("unterminated string"),
                             .span =
                                 {
                                     .begin_pos = {.line = 1, .col = 5},
@@ -921,7 +933,7 @@ TEST_CASE("fuzz the lexer") {
 
                             // BEGIN AI CODE
                             using cs2_lib::sexp::Span;
-                            using cs2_lib::sexp::lexer::ErrorData;
+                            using cs2_lib::sexp::ErrorData;
                             using cs2_lib::sexp::lexer::TokenType;
                             const std::string_view src{buf};
 

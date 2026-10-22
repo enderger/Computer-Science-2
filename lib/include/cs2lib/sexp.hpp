@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <expected>
 #include <format>
 #include <iterator>
 #include <locale>
@@ -104,6 +105,62 @@ const inline cpptrace::formatter strace_fmt =
 } // namespace _impl
 
 ///
+/// Special data implementation for in-stream errors
+///
+struct ErrorData {
+    ///
+    /// The error message
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::string message;
+
+    ///
+    /// The subsystem from which this error originates
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    std::string subsystem;
+
+#ifdef CS2LIB_DEBUG
+    ///
+    /// The span of the error
+    ///
+    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+    cpptrace::raw_trace trace;
+#endif
+
+
+    constexpr auto operator==(const ErrorData &other) const -> bool {
+        return this->message == other.message;
+    }
+
+    class Factory {
+      public:
+        constexpr Factory(std::string subsystem) : subsystem{std::move(subsystem)} {}
+
+        ///
+        /// Create a new error instance for this data
+        ///
+        [[nodiscard]] constexpr auto create(std::string message) const -> ErrorData {
+            return { std::move(message), this->subsystem };
+        }
+
+      private:
+        std::string subsystem;
+    };
+
+  private:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    ErrorData(std::string message, std::string subsystem)
+        : message{std::move(message)}, subsystem{std::move(subsystem)}
+#ifdef CS2LIB_DEBUG
+          ,
+          trace{cpptrace::generate_raw_trace()}
+#endif
+    {
+    }
+};
+
+///
 /// Settings for the lexer and parser
 ///
 struct Settings {
@@ -148,6 +205,8 @@ class Span {
 
         constexpr auto operator==(const Position &other) const
             -> bool = default;
+
+        constexpr auto operator<=>(const Position &other) const = default;
     };
 
     ///
@@ -196,6 +255,17 @@ class Span {
             this->index = this->index + this->length;
             this->length = 0;
             return *this;
+        }
+
+        ///
+        /// Compare two spans by position
+        ///
+        [[nodiscard]] constexpr auto operator<=>(const PositionSpan &other)
+            const {
+            if (this->end_pos > other.end_pos) {
+                return std::partial_ordering::unordered;
+            }
+            return this->begin_pos <=> other.begin_pos;
         }
     };
 
@@ -298,6 +368,11 @@ class Span {
     }
 
     ///
+    /// Join this span to another span. Spans must be in order of appearance in the code
+    ///
+    [[nodiscard]] auto join(const Span &span) && -> std::expected<Span, std::string>;
+
+    ///
     /// End the current span, returning a new span. This takes an rvalue to the
     /// original span. This was done to make the "new span" part explicit.
     ///
@@ -350,83 +425,6 @@ class Span {
     friend class std::formatter<Span>;
 };
 
-///
-/// The shared error type for my S-expression parser
-///
-class Error {
-  public:
-    // HACK: The preprocessor shenanigans get me compiler independent
-    // stacktraces
-    //       in debug builds while still having pure dependency-free releases
-    Error(Span span, std::string message
-#ifdef CS2LIB_DEBUG
-          ,
-          cpptrace::raw_trace trace = cpptrace::generate_raw_trace()
-#endif // CS2LIB_DEBUG
-              )
-        : span{span}, error_message{std::move(message)}
-#ifdef CS2LIB_DEBUG
-          ,
-          strace{std::move(trace)}
-#endif // CS2LIB_DEBUG
-    {
-    }
-
-    // VIRTUAL METHODS
-    ///
-    /// Which subsystem the error is coming from
-    ///
-    [[nodiscard]] virtual auto subsystem() const -> std::string_view = 0;
-
-    // CONSTRUCTORS / DESTRUCTORS
-    virtual ~Error() = default;
-
-    // ACCESSORS / MUTATORS
-    [[nodiscard]] constexpr auto get_span() const -> const Span & {
-        return this->span;
-    }
-
-    [[nodiscard]] constexpr auto get_message() const -> std::string_view {
-        return this->error_message;
-    }
-
-    // OPERATORS
-    auto operator==(const Error &other) const -> bool {
-        if (typeid(*this) != typeid(other)) {
-            return false;
-        }
-
-        return this->equals(other);
-    }
-
-  protected:
-    ///
-    /// Protected comparison operator.
-    /// `other` will always have a value of the casted type
-    ///
-    [[nodiscard]] virtual auto equals(const Error &other) const -> bool = 0;
-
-  private:
-    ///
-    /// Where the error occurs
-    ///
-    Span span;
-
-    ///
-    /// The error message to send from this file
-    ///
-    std::string error_message;
-
-#ifdef CS2LIB_DEBUG
-    ///
-    /// The compiler stacktrace (or empty on release builds)
-    ///
-    cpptrace::raw_trace strace;
-#endif // CS2LIB_DEBUG
-
-    friend class std::formatter<Error>;
-};
-
 namespace _impl {
 #ifdef CS2LIB_DEBUG
 
@@ -448,6 +446,7 @@ class ICEBase : public std::exception {
 
 #endif // CS2LIB_DEBUG
 } // namespace _impl
+
 
 ///
 /// An internal compiler error, stacktrace included in a debug build
@@ -515,38 +514,6 @@ enum class TokenType : uint8_t {
     /// An error in the token stream
     ///
     Error,
-};
-
-///
-/// Special data implementation for the error tokens
-///
-struct ErrorData {
-    ///
-    /// The error message
-    ///
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    std::string message;
-
-#ifdef CS2LIB_DEBUG
-    ///
-    /// The span of the error
-    ///
-    // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-    cpptrace::raw_trace trace;
-#endif
-
-    ErrorData(std::string message)
-        : message{std::move(message)}
-#ifdef CS2LIB_DEBUG
-          ,
-          trace{cpptrace::generate_raw_trace()}
-#endif
-    {
-    }
-
-    constexpr auto operator==(const ErrorData &other) const -> bool {
-        return this->message == other.message;
-    }
 };
 
 ///
@@ -671,6 +638,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
         Span span;
         std::optional<Token> current;
         bool has_emitted_eof{false};
+        ErrorData::Factory error_data_factory{"lexer"};
 
         constexpr auto is_atom_terminator(char data) -> bool {
             return data == '(' || data == ')' || data == ';' ||
@@ -761,7 +729,7 @@ class TokenStream : public std::ranges::view_interface<TokenStream<R>> {
 
             if (!complete) {
                 return Token{TokenType::Error, this->span,
-                             ErrorData{"unterminated string"}};
+                             this->error_data_factory.create("unterminated string")};
             }
             return Token{TokenType::Atom, this->span, this->get_slice()};
         }
@@ -889,19 +857,46 @@ static_assert(std::ranges::view<decltype(std::string_view{} |
 using lexer::Lexer;
 
 namespace reader {
-class Datum;
 
+struct Atom;
+class ListDatum;
+
+struct ReaderError {
+    ErrorData base;
+    Span span;
+};
+
+///
+/// An element of the reader's AST
+///
+using Datum = std::variant<Atom, ListDatum, ReaderError>;
+
+///
+/// A singular atom in the source code
+///
 struct Atom {
     std::string_view text;
     Span span;
 };
 
-struct ListDatum {
+///
+/// A list of datums in the source text
+///
+class ListDatum {
+  public:
+    constexpr ListDatum(Span begin) : span{begin} {}
+
+    constexpr void operator+=(Datum &&datum) {
+        this->span += std::visit([&](const auto &datum) -> Span {
+            return datum.span;
+        }, datum);
+        this->items.push_front(std::make_unique<Datum>(std::forward<Datum>(datum)));
+    }
+  private:
     list::List<std::unique_ptr<Datum>> items;
+    std::optional<std::unique_ptr<Datum>> tail;
+    Span span;
 };
-
-using Datum = std::variant<Atom, ListDatum>;
-
 
 
 ///
@@ -911,11 +906,94 @@ template <std::ranges::input_range R>
     requires std::same_as<std::ranges::range_value_t<R>, lexer::Token>
 class Reader {
   public:
-    constexpr Reader(R &&range)
+    constexpr Reader(R &&range) : data{range} {}
+
+    ///
+    /// Read a single datum from the file
+    ///
+    constexpr auto read() -> std::optional<Datum> {
+        for (const lexer::Token &token : this->data) {
+            switch (token.type) {
+            case lexer::TokenType::Atom: {
+                Atom atom{ .text = std::get<std::string_view>(token.data),
+                           .span = token.span };
+
+                try {
+                    std::get<ListDatum>(parse_stack.car().value().get()) += atom;
+                } catch (std::bad_variant_access &bva) {
+                    throw InternalCompilerError("Parse stack does not have a valid top type to insert atom into");
+                }
+
+                break;
+            }
+
+            case lexer::TokenType::LParen: {
+                this->parse_stack.push_front(ListDatum{token.span});
+                break;
+            }
+
+            case lexer::TokenType::RParen: {
+                std::optional datum = this->parse_stack.pop_front();
+
+                if (this->parse_stack.empty()) {
+                    return datum;
+                }
+
+                try {
+                    auto datum = std::get<ListDatum>(this->parse_stack.car().value().get());
+                    datum.reverse();
+                } catch (const std::bad_variant_access &bva) {
+                    throw InternalCompilerError("Parse stack does not have a valid top type to insert list into");
+                }
+                break;
+            }
+
+            case lexer::TokenType::Eof:
+                if (this->parse_stack.empty()) {
+                    return std::nullopt;
+                } else {
+                    this->parse_stack.pop
+                }
+                break;
+
+            case lexer::TokenType::Error:
+                if (this->parse_stack.empty()) {
+                    this->parse_stack.emplace_front(ReaderError{
+                        .base = std::get<ErrorData>(token.data),
+                        .span = token.span,
+                    });
+                }
+                break;
+            }
+
+            if (this->parse_stack.empty()) {
+                return std::nullopt;
+            }
+
+            if (this->parse_stack.cdr().empty()) {
+                std::optional result = std::visit(this->parse_stack.car().value().get(), [&](auto &&data) -> std::optional<Datum>{
+                    using T = std::decay_t<decltype(data)>;
+                    if constexpr (std::is_same_v<T, ListDatum>) {
+                        return std::nullopt;
+                    } else if constexpr (std::is_same_v<T, Atom>
+                        || std::is_same_v<T, std::pair<ErrorData, Span>>) {
+                        return data;
+                    } else {
+                        static_assert(false, "New variant added to Datum, update the single datum cases.");
+                    }
+                });
+
+                if (result) {
+                    (void)parse_stack.pop_front();
+                    return result;
+                }
+            }
+        }
+    }
 
   private:
     R data;
-    cs2_lib::list::List<Datum> parse_stack{};
+    cs2_lib::list::List<Datum> parse_stack;
 };
 } // namespace reader
 using reader::Reader;
@@ -997,30 +1075,6 @@ template <> class std::formatter<cs2_lib::sexp::Span> {
 };
 
 template <>
-class std::formatter<cs2_lib::sexp::Error>
-    : public std::formatter<std::string> {
-  public:
-    template <class FormatCtx>
-    constexpr auto format(const cs2_lib::sexp::Error &err,
-                          FormatCtx &ctx) const {
-#ifdef CS2LIB_DEBUG
-        return std::formatter<std::string>::format(
-            std::format(
-                "{}: error: ({}) {}\n{}", err.span, err.subsystem(),
-                err.error_message,
-                cs2_lib::sexp::_impl::strace_fmt.format(err.strace.resolve())),
-            ctx);
-#else
-        return std::formatter<std::string>::format(
-            std::format("{}: error: ({}) {}", err.span, err.subsystem(),
-                        err.error_message),
-            ctx);
-
-#endif // CS2LIB_DEBUG
-    }
-};
-
-template <>
 class std::formatter<cs2_lib::sexp::lexer::TokenType>
     : public std::formatter<std::string> {
   public:
@@ -1055,14 +1109,15 @@ class std::formatter<cs2_lib::sexp::lexer::TokenType>
 };
 
 template <>
-class std::formatter<cs2_lib::sexp::lexer::ErrorData>
+class std::formatter<cs2_lib::sexp::ErrorData>
     : public std::formatter<std::string> {
   public:
     template <class FormatCtx>
-    constexpr auto format(const cs2_lib::sexp::lexer::ErrorData &err,
+    constexpr auto format(const cs2_lib::sexp::ErrorData &err,
                           FormatCtx &ctx) const {
         return std::formatter<std::string>::format(
-            std::format("(Error \"{}\")", err.message), ctx);
+            std::format("(Error \"{}\" :in {})", err.message, err.subsystem),
+            ctx);
     }
 };
 
@@ -1079,7 +1134,7 @@ class std::formatter<cs2_lib::sexp::lexer::Token>
                 if constexpr (std::is_same_v<T, std::string_view>) {
                     return data.empty() ? ":empty" : std::format("'{}", data);
                 } else if constexpr (std::is_same_v<
-                                         T, cs2_lib::sexp::lexer::ErrorData>) {
+                                         T, cs2_lib::sexp::ErrorData>) {
                     return std::format("{}", data);
                 } else {
                     static_assert(false,
